@@ -4,12 +4,34 @@ import barang.*;
 import page.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.sql.SQLException;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
+/**
+ * Panel tambah (juga dipakai untuk edit jika Mainmenu menukar panel dengan instance ini).
+ * Desain persis seperti yang kamu minta.
+ */
 public class tambahdatasupplier extends JPanel {
 
+    private RoundedTextField fldKode;
+    private RoundedTextField fldNama;
+    private RoundedTextField fldAlamat;
+    private RoundedTextField fldTelp;
+
+    private SupplierDAO dao;
+
     public tambahdatasupplier() {
+        try {
+            dao = new SupplierDAO();
+        } catch (Exception ex) {
+            dao = null;
+            JOptionPane.showMessageDialog(this, "Gagal inisialisasi SupplierDAO:\n" + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+        }
+        initUI();
+    }
+
+    private void initUI() {
         setLayout(new BorderLayout());
         setBackground(new Color(236,236,236));
         setBorder(new EmptyBorder(30, 50, 30, 50));
@@ -39,12 +61,10 @@ public class tambahdatasupplier extends JPanel {
         gbc.weightx = 1.0;
 
         // Baris input
-     
         addField(formPanel, gbc, 0, "Kode Supplier:");
         addField(formPanel, gbc, 1, "Nama Supplier:");
         addField(formPanel, gbc, 2, "Alamat Supplier:");
         addField(formPanel, gbc, 3, "No. Telp:");
-
 
         // ===== Tombol =====
         RoundedButton btnKembali = new RoundedButton("Kembali", new Color(235, 235, 235), new Color(60, 60, 60));
@@ -53,15 +73,13 @@ public class tambahdatasupplier extends JPanel {
         btnKembali.setPreferredSize(new Dimension(140, 45));
         btnSimpan.setPreferredSize(new Dimension(140, 45));
 
-        btnSimpan.addActionListener(e ->
-            JOptionPane.showMessageDialog(this, "✅ Data supplier berhasil disimpan!", "Sukses", JOptionPane.INFORMATION_MESSAGE)
-        );
+        btnSimpan.addActionListener(e -> onSave());
         btnKembali.addActionListener(e -> {
-    JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-    if (frame instanceof uiresponsive.Mainmenu) {
-        ((uiresponsive.Mainmenu) frame).showDataSupplier();
-    }
-});
+            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            if (frame instanceof uiresponsive.Mainmenu) {
+                ((uiresponsive.Mainmenu) frame).showDataSupplier();
+            }
+        });
 
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 25, 10));
         bottomPanel.setOpaque(false);
@@ -94,20 +112,62 @@ public class tambahdatasupplier extends JPanel {
         fieldPanel.add(field, BorderLayout.CENTER);
 
         panel.add(fieldPanel, gbc);
+
+        // assign ke field kelas berdasarkan labelText
+        String key = labelText.toLowerCase();
+        if (key.contains("kode")) fldKode = field;
+        else if (key.contains("nama")) fldNama = field;
+        else if (key.contains("alamat")) fldAlamat = field;
+        else if (key.contains("telp") || key.contains("no.")) fldTelp = field;
+
+        // kode biasanya kosong / readonly for add
+        if (fldKode != null) fldKode.setEditable(false);
+    }
+
+    private void onSave() {
+        String nama = fldNama.getText().trim();
+        String alamat = fldAlamat.getText().trim();
+        String telp = fldTelp.getText().trim();
+
+        if (nama.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Nama supplier harus diisi.", "Validasi", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (dao == null) {
+            JOptionPane.showMessageDialog(this, "Database tidak tersedia. Tidak bisa menyimpan.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        try {
+            Supplier s = new Supplier();
+            s.setNamaSupplier(nama);
+            s.setAlamatSupplier(alamat);
+            s.setNotelpSupplier(telp);
+            int newId = dao.insert(s);
+            if (newId > 0) {
+                JOptionPane.showMessageDialog(this, "✅ Data supplier berhasil disimpan! (ID: " + newId + ")", "Sukses", JOptionPane.INFORMATION_MESSAGE);
+                // kembali ke daftar
+                JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+                if (frame instanceof uiresponsive.Mainmenu) {
+                    ((uiresponsive.Mainmenu) frame).showDataSupplier();
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Insert gagal (tidak mendapatkan id).", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal menyimpan data supplier:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     // === Rounded TextField ===
     class RoundedTextField extends JTextField {
         private int radius = 15;
-
         public RoundedTextField(int size) {
             super(size);
             setOpaque(false);
             setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
         }
-
-        @Override
-        protected void paintComponent(Graphics g) {
+        @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(Color.WHITE);
@@ -124,7 +184,6 @@ public class tambahdatasupplier extends JPanel {
         private final Color backgroundColor;
         private final Color textColor;
         private int radius = 25;
-
         public RoundedButton(String text, Color bg, Color fg) {
             super(text);
             this.backgroundColor = bg;
@@ -135,29 +194,20 @@ public class tambahdatasupplier extends JPanel {
             setFont(new Font("Segoe UI", Font.BOLD, 15));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         }
-
-        @Override
-        protected void paintComponent(Graphics g) {
+        @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            // Shadow halus (lebih smooth dan lembut)
             for (int i = 0; i < 6; i++) {
-                g2.setColor(new Color(0, 0, 0, 10 - i)); // semakin redup di luar
+                g2.setColor(new Color(0, 0, 0, Math.max(0, 10 - i)));
                 g2.fillRoundRect(i, i + 2, getWidth() - i * 2, getHeight() - i * 2, radius, radius);
             }
-
-            // Warna tombol
             g2.setColor(backgroundColor);
             g2.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, radius, radius);
-
-            // Teks tombol
             g2.setColor(textColor);
             FontMetrics fm = g2.getFontMetrics();
             int textX = (getWidth() - fm.stringWidth(getText())) / 2;
             int textY = (getHeight() + fm.getAscent()) / 2 - 3;
             g2.drawString(getText(), textX, textY);
-
             g2.dispose();
         }
     }
