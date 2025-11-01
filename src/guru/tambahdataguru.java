@@ -5,12 +5,23 @@ import barang.*;
 import page.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.sql.*;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
 public class tambahdataguru extends JPanel {
 
+    // field references (untuk fill/save)
+    private JTextField fldId;
+    private JTextField fldNama;
+    private JTextField fldTelp;
+    private JTextField fldJabatan;
+
+    private GuruDAO dao;
+
     public tambahdataguru() {
+        try { dao = new GuruDAO(); } catch (Exception ex) { dao = null; }
+
         setLayout(new BorderLayout());
         setBackground(new Color(236,236,236));
         setBorder(new EmptyBorder(30, 50, 30, 50));
@@ -39,13 +50,19 @@ public class tambahdataguru extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
 
-        // Baris input
-     
-        addField(formPanel, gbc, 0, "ID Guru:");
-        addField(formPanel, gbc, 1, "Nama Guru:");
-        addField(formPanel, gbc, 2, "No. Telp:");
-        addField(formPanel, gbc, 3, "Jabatan:");
+        // create fields using the same RoundedTextField visuals (keaslian desain)
+        fldId = new RoundedTextField(12);
+        fldId.setEditable(false); // id tidak diisi manual
+        addField(formPanel, gbc, 0, "ID Guru:", fldId);
 
+        fldNama = new RoundedTextField(12);
+        addField(formPanel, gbc, 1, "Nama Guru:", fldNama);
+
+        fldTelp = new RoundedTextField(12);
+        addField(formPanel, gbc, 2, "No. Telp:", fldTelp);
+
+        fldJabatan = new RoundedTextField(12);
+        addField(formPanel, gbc, 3, "Jabatan:", fldJabatan);
 
         // ===== Tombol =====
         RoundedButton btnKembali = new RoundedButton("Kembali", new Color(235, 235, 235), new Color(60, 60, 60));
@@ -54,15 +71,14 @@ public class tambahdataguru extends JPanel {
         btnKembali.setPreferredSize(new Dimension(140, 45));
         btnSimpan.setPreferredSize(new Dimension(140, 45));
 
-        btnSimpan.addActionListener(e ->
-            JOptionPane.showMessageDialog(this, "✅ Data guru berhasil disimpan!", "Sukses", JOptionPane.INFORMATION_MESSAGE)
-        );
+        btnSimpan.addActionListener(e -> onSave());
         btnKembali.addActionListener(e -> {
-    JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-    if (frame instanceof uiresponsive.Mainmenu) {
-        ((uiresponsive.Mainmenu) frame).showDataGuru();
-    }
-});
+            GuruContext.editingId = null;
+            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            if (frame instanceof uiresponsive.Mainmenu) {
+                ((uiresponsive.Mainmenu) frame).showDataGuru();
+            }
+        });
 
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 25, 10));
         bottomPanel.setOpaque(false);
@@ -73,10 +89,17 @@ public class tambahdataguru extends JPanel {
         add(topPanel, BorderLayout.NORTH);
         add(formPanel, BorderLayout.CENTER);
         add(bottomPanel, BorderLayout.SOUTH);
+
+        // load when shown (edit mode)
+        this.addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
+                SwingUtilities.invokeLater(() -> loadIfEdit());
+            }
+        });
     }
 
-    // === Helper: Field input ===
-    private void addField(JPanel panel, GridBagConstraints gbc, int gridx, String labelText) {
+    // reuse original addField style but accept component so visuals unchanged
+    private void addField(JPanel panel, GridBagConstraints gbc, int gridx, String labelText, JComponent comp) {
         int row = gridx / 3;
         int col = gridx % 3;
 
@@ -88,16 +111,84 @@ public class tambahdataguru extends JPanel {
         JLabel label = new JLabel(labelText);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
-        RoundedTextField field = new RoundedTextField(12);
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        comp.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
         fieldPanel.add(label, BorderLayout.NORTH);
-        fieldPanel.add(field, BorderLayout.CENTER);
+        fieldPanel.add(comp, BorderLayout.CENTER);
 
         panel.add(fieldPanel, gbc);
     }
 
-    // === Rounded TextField ===
+    private void loadIfEdit() {
+        if (GuruContext.editingId == null) {
+            fldId.setText("");
+            fldNama.setText("");
+            fldTelp.setText("");
+            fldJabatan.setText("");
+            return;
+        }
+        if (dao == null) return;
+        try {
+            Guru g = dao.findById(GuruContext.editingId);
+            if (g == null) {
+                JOptionPane.showMessageDialog(this, "Data guru tidak ditemukan.", "Error", JOptionPane.ERROR_MESSAGE);
+                GuruContext.editingId = null;
+                return;
+            }
+            fldId.setText(String.valueOf(g.getIdGuru()));
+            fldNama.setText(g.getNamaGuru());
+            fldTelp.setText(g.getNotelpGuru());
+            fldJabatan.setText(g.getJabatan());
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal memuat data guru:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void onSave() {
+        if (dao == null) { JOptionPane.showMessageDialog(this, "Database tidak tersedia.", "Error", JOptionPane.ERROR_MESSAGE); return; }
+        String nama = fldNama.getText().trim();
+        String telp = fldTelp.getText().trim();
+        String jab = fldJabatan.getText().trim();
+        if (nama.isEmpty()) { JOptionPane.showMessageDialog(this, "Nama guru harus diisi.", "Validasi", JOptionPane.WARNING_MESSAGE); return; }
+
+        try {
+            if (GuruContext.editingId == null) {
+                Guru g = new Guru();
+                g.setNamaGuru(nama);
+                g.setNotelpGuru(telp.isEmpty() ? null : telp);
+                g.setJabatan(jab.isEmpty() ? null : jab);
+                int newId = dao.insert(g);
+                if (newId > 0) {
+                    JOptionPane.showMessageDialog(this, "Guru berhasil disimpan.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this, "Gagal menyimpan guru.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                Guru g = new Guru();
+                g.setIdGuru(GuruContext.editingId);
+                g.setNamaGuru(nama);
+                g.setNotelpGuru(telp.isEmpty() ? null : telp);
+                g.setJabatan(jab.isEmpty() ? null : jab);
+                dao.update(g);
+                JOptionPane.showMessageDialog(this, "Guru berhasil diupdate.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
+                GuruContext.editingId = null;
+            }
+            // kembali ke daftar
+            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            if (frame instanceof uiresponsive.Mainmenu) {
+                ((uiresponsive.Mainmenu) frame).showDataGuru();
+            }
+        } catch (SQLException ex) {
+            String msg = ex.getMessage();
+            if (msg != null && msg.toLowerCase().contains("unique")) {
+                JOptionPane.showMessageDialog(this, "Nama guru sudah ada. Gunakan nama lain.", "Duplicate", JOptionPane.ERROR_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "Gagal menyimpan guru:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    // === Rounded TextField === (sama persis desainmu)
     class RoundedTextField extends JTextField {
         private int radius = 15;
 
@@ -120,7 +211,7 @@ public class tambahdataguru extends JPanel {
         }
     }
 
-    // === Rounded Button (smooth shadow & besar) ===
+    // === Rounded Button (sama persis desainmu) ===
     class RoundedButton extends JButton {
         private final Color backgroundColor;
         private final Color textColor;

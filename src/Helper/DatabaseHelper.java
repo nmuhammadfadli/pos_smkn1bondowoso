@@ -225,7 +225,7 @@ public class DatabaseHelper {
                     ps.setString(4, "Jl. Administrator 1");
                     ps.setString(5, "Administrator");
                     ps.setString(6, "Admin Sistem");
-                    ps.setInt(7, 99);
+                    ps.setInt(7, 0);
                     ps.setString(8, "admin@example.com");
                     ps.setString(9, "0811000001");
                     ps.executeUpdate();
@@ -325,73 +325,73 @@ public class DatabaseHelper {
         return conn;
     }
 
-    // ----- ensure sample pengguna exists even if DB file already existed -----
-    private static void ensureSamplePengguna(Connection conn) {
-    try (PreparedStatement psCheck = conn.prepareStatement("SELECT COUNT(1) FROM data_pengguna");
-         ResultSet rs = psCheck.executeQuery()) {
-        int count = 0;
-        if (rs.next()) count = rs.getInt(1);
-        if (count == 0) {
-            System.out.println("data_pengguna kosong — akan disisipkan sample pengguna.");
-            // gunakan transaction agar semua insert konsisten
-            boolean oldAuto = conn.getAutoCommit();
-            try {
-                conn.setAutoCommit(false);
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO data_pengguna (id_pengguna, username, password, alamat, jabatan, nama_lengkap, hak_akses, email, notelp_pengguna) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-                    // Admin
-                    ps.setString(1, "USR001");
-                    ps.setString(2, "admin");
-                    ps.setString(3, "admin");
-                    ps.setString(4, "Jl. Administrator 1");
-                    ps.setString(5, "Administrator");
-                    ps.setString(6, "Admin Sistem");
-                    ps.setInt(7, 99);
-                    ps.setString(8, "admin@example.com");
-                    ps.setString(9, "0811000001");
-                    int u = ps.executeUpdate();
-                    System.out.println("Inserted admin rows = " + u);
-
-                    // Kasir 1
-                    ps.setString(1, "USR002");
-                    ps.setString(2, "kasir1");
-                    ps.setString(3, "kasir123");
-                    ps.setString(4, "Jl. Kasir 2");
-                    ps.setString(5, "Kasir");
-                    ps.setString(6, "Budi Santoso");
-                    ps.setInt(7, 1);
-                    ps.setString(8, "budi@example.com");
-                    ps.setString(9, "0811000002");
-                    u = ps.executeUpdate();
-                    System.out.println("Inserted kasir1 rows = " + u);
-
-                    // Kasir 2
-                    ps.setString(1, "USR003");
-                    ps.setString(2, "kasir2");
-                    ps.setString(3, "kasir123");
-                    ps.setString(4, "Jl. Kasir 3");
-                    ps.setString(5, "Kasir");
-                    ps.setString(6, "Siti Rahma");
-                    ps.setInt(7, 1);
-                    ps.setString(8, "siti@example.com");
-                    ps.setString(9, "0811000003");
-                    u = ps.executeUpdate();
-                    System.out.println("Inserted kasir2 rows = " + u);
-                }
-                conn.commit();
-            } catch (Throwable t) {
-                try { conn.rollback(); } catch (Throwable ignore) {}
-                System.err.println("Gagal menyisipkan sample pengguna (rollback): " + t.getMessage());
-            } finally {
-                try { conn.setAutoCommit(oldAuto); } catch (SQLException ignore) {}
-            }
-        } else {
-            System.out.println("data_pengguna sudah berisi " + count + " baris; sample tidak disisipkan.");
-        }
-    } catch (Throwable t) {
-        System.err.println("Gagal mengecek/menyisipkan sample pengguna: " + t.getMessage());
-    }
-}
+//    // ----- ensure sample pengguna exists even if DB file already existed -----
+//    private static void ensureSamplePengguna(Connection conn) {
+//    try (PreparedStatement psCheck = conn.prepareStatement("SELECT COUNT(1) FROM data_pengguna");
+//         ResultSet rs = psCheck.executeQuery()) {
+//        int count = 0;
+//        if (rs.next()) count = rs.getInt(1);
+//        if (count == 0) {
+//            System.out.println("data_pengguna kosong — akan disisipkan sample pengguna.");
+//            // gunakan transaction agar semua insert konsisten
+//            boolean oldAuto = conn.getAutoCommit();
+//            try {
+//                conn.setAutoCommit(false);
+//                try (PreparedStatement ps = conn.prepareStatement(
+//                        "INSERT INTO data_pengguna (id_pengguna, username, password, alamat, jabatan, nama_lengkap, hak_akses, email, notelp_pengguna) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+//                    // Admin
+//                    ps.setString(1, "USR001");
+//                    ps.setString(2, "admin");
+//                    ps.setString(3, "admin");
+//                    ps.setString(4, "Jl. Administrator 1");
+//                    ps.setString(5, "Administrator");
+//                    ps.setString(6, "Admin Sistem");
+//                    ps.setInt(7, 99);
+//                    ps.setString(8, "admin@example.com");
+//                    ps.setString(9, "0811000001");
+//                    int u = ps.executeUpdate();
+//                    System.out.println("Inserted admin rows = " + u);
+//
+//                    // Kasir 1
+//                    ps.setString(1, "USR002");
+//                    ps.setString(2, "kasir1");
+//                    ps.setString(3, "kasir123");
+//                    ps.setString(4, "Jl. Kasir 2");
+//                    ps.setString(5, "Kasir");
+//                    ps.setString(6, "Budi Santoso");
+//                    ps.setInt(7, 1);
+//                    ps.setString(8, "budi@example.com");
+//                    ps.setString(9, "0811000002");
+//                    u = ps.executeUpdate();
+//                    System.out.println("Inserted kasir1 rows = " + u);
+//
+//                    // Kasir 2
+//                    ps.setString(1, "USR003");
+//                    ps.setString(2, "kasir2");
+//                    ps.setString(3, "kasir123");
+//                    ps.setString(4, "Jl. Kasir 3");
+//                    ps.setString(5, "Kasir");
+//                    ps.setString(6, "Siti Rahma");
+//                    ps.setInt(7, 1);
+//                    ps.setString(8, "siti@example.com");
+//                    ps.setString(9, "0811000003");
+//                    u = ps.executeUpdate();
+//                    System.out.println("Inserted kasir2 rows = " + u);
+//                }
+//                conn.commit();
+//            } catch (Throwable t) {
+//                try { conn.rollback(); } catch (Throwable ignore) {}
+//                System.err.println("Gagal menyisipkan sample pengguna (rollback): " + t.getMessage());
+//            } finally {
+//                try { conn.setAutoCommit(oldAuto); } catch (SQLException ignore) {}
+//            }
+//        } else {
+//            System.out.println("data_pengguna sudah berisi " + count + " baris; sample tidak disisipkan.");
+//        }
+//    } catch (Throwable t) {
+//        System.err.println("Gagal mengecek/menyisipkan sample pengguna: " + t.getMessage());
+//    }
+//}
     
     public static String generateNextVoucherCode() throws SQLException {
     try (Connection conn = getConnection()) {

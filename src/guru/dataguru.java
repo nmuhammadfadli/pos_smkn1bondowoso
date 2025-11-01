@@ -1,8 +1,10 @@
 package guru;
 
-
 import supplier.*;
 import java.awt.*;
+import java.awt.event.*;
+import java.sql.SQLException;
+import java.util.List;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.DefaultTableModel;
@@ -13,8 +15,28 @@ public class dataguru extends JPanel {
     private DefaultTableModel model;
     private JTextField searchField;
 
+    private GuruDAO dao;
+
     public dataguru() {
+        try {
+            dao = new GuruDAO();
+        } catch (Exception ex) {
+            dao = null;
+            JOptionPane.showMessageDialog(this,
+                    "Gagal inisialisasi GuruDAO:\n" + ex.getMessage(),
+                    "DB Error", JOptionPane.ERROR_MESSAGE);
+        }
         initUI();
+
+        // reload saat panel menjadi visible (robust terhadap Mainmenu show)
+        this.addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
+                SwingUtilities.invokeLater(() -> loadData());
+            }
+        });
+
+        // initial load jika panel langsung visible
+        if (isShowing()) loadData();
     }
 
     private void initUI() {
@@ -28,7 +50,7 @@ public class dataguru extends JPanel {
         JPanel topPanel = new JPanel(new BorderLayout(10, 10));
         topPanel.setOpaque(false);
 
-        // Search field
+        // Search field (tetap seperti desain)
         searchField = new JTextField();
         searchField.putClientProperty("JTextField.placeholderText", "Cari nama guru...");
         searchField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
@@ -39,29 +61,11 @@ public class dataguru extends JPanel {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonPanel.setOpaque(false);
 
-        
         JButton btnTambah = createButton("Tambah Guru", new Color(46, 204, 113));
-        btnTambah.addActionListener(e -> {
-    // ambil frame induk (Mainmenu)
-    JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-    if (frame instanceof uiresponsive.Mainmenu) {
-        ((uiresponsive.Mainmenu) frame).showTambahDataGuru(); // panggil method di Mainmenu
-    }
-});
-
-        
         JButton btnEdit = createButton("Edit", new Color(52, 152, 219));
-        btnEdit.addActionListener(e -> {
-    // ambil frame induk (Mainmenu)
-    JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-    if (frame instanceof uiresponsive.Mainmenu) {
-        ((uiresponsive.Mainmenu) frame).showTambahDataGuru();// panggil method di Mainmenu
-    }
-});
-        
         JButton btnHapus = createButton("Hapus", new Color(231, 76, 60));
         JButton btnRefresh = createButton("Refresh", new Color(155, 89, 182));
-    
+
         buttonPanel.add(btnTambah);
         buttonPanel.add(btnEdit);
         buttonPanel.add(btnHapus);
@@ -71,7 +75,7 @@ public class dataguru extends JPanel {
         topPanel.add(buttonPanel, BorderLayout.EAST);
 
         // =============================
-        // TABEL DATA BARANG
+        // TABEL DATA GURU
         // =============================
         String[] columns = {"ID Guru", "Nama Guru", "No. Telp", "Jabatan"};
         model = new DefaultTableModel(columns, 0);
@@ -90,82 +94,194 @@ public class dataguru extends JPanel {
         scrollPane.setBackground(Color.WHITE);
         scrollPane.setOpaque(true);
 
-        // Dummy data
+        // Dummy data (akan di-reload kalau DB tersedia)
         model.addRow(new Object[]{"GR001", "Parto", "082233236128", "Guru"});
-        
 
         // =============================
         // TAMBAHKAN SEMUA KE PANEL
         // =============================
         add(topPanel, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
+
+        // ========== ACTIONS ==========
+        btnTambah.addActionListener(e -> {
+            GuruContext.editingId = null;
+            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            if (frame instanceof uiresponsive.Mainmenu) {
+                ((uiresponsive.Mainmenu) frame).showTambahDataGuru();
+            }
+        });
+
+        btnEdit.addActionListener(e -> {
+            int sel = table.getSelectedRow();
+            if (sel < 0) { JOptionPane.showMessageDialog(this, "Pilih guru yang akan diedit.", "Validasi", JOptionPane.WARNING_MESSAGE); return; }
+            Integer id = parseIntSafe(model.getValueAt(sel, 0));
+            if (id == null) { JOptionPane.showMessageDialog(this, "ID guru tidak valid.", "Error", JOptionPane.ERROR_MESSAGE); return; }
+            GuruContext.editingId = id;
+            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            if (frame instanceof uiresponsive.Mainmenu) ((uiresponsive.Mainmenu) frame).showTambahDataGuru();
+        });
+
+        btnHapus.addActionListener(e -> {
+            if (dao == null) { JOptionPane.showMessageDialog(this, "Database tidak tersedia.", "Error", JOptionPane.ERROR_MESSAGE); return; }
+            int sel = table.getSelectedRow();
+            if (sel < 0) { JOptionPane.showMessageDialog(this, "Pilih guru yang akan dihapus.", "Validasi", JOptionPane.WARNING_MESSAGE); return; }
+            Integer id = parseIntSafe(model.getValueAt(sel, 0));
+            String nama = String.valueOf(model.getValueAt(sel, 1));
+            if (id == null) { JOptionPane.showMessageDialog(this, "ID tidak valid.", "Error", JOptionPane.ERROR_MESSAGE); return; }
+            int ok = JOptionPane.showConfirmDialog(this, "Hapus guru \"" + nama + "\" (ID: " + id + ") ?", "Konfirmasi Hapus", JOptionPane.YES_NO_OPTION);
+            if (ok != JOptionPane.YES_OPTION) return;
+            try {
+                dao.delete(id);
+                JOptionPane.showMessageDialog(this, "Guru berhasil dihapus.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
+                loadData();
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this, "Gagal menghapus guru:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        btnRefresh.addActionListener(e -> loadData());
+
+        // double-click => edit (pakai same flow: showTambahDataGuru untuk edit)
+        table.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int r = table.rowAtPoint(e.getPoint());
+                    if (r >= 0) {
+                        Integer id = parseIntSafe(model.getValueAt(r, 0));
+                        if (id != null) {
+                            GuruContext.editingId = id;
+                            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(dataguru.this);
+                            if (frame instanceof uiresponsive.Mainmenu) ((uiresponsive.Mainmenu) frame).showTambahDataGuru();
+                        }
+                    }
+                }
+            }
+        });
+
+        // search realtime
+        searchField.addKeyListener(new KeyAdapter() {
+            @Override public void keyReleased(KeyEvent e) {
+                filterTable(searchField.getText().trim());
+            }
+        });
+    }
+
+    private Integer parseIntSafe(Object o) {
+        if (o == null) return null;
+        if (o instanceof Integer) return (Integer)o;
+        try { return Integer.parseInt(String.valueOf(o)); } catch (Exception ex) { return null; }
+    }
+
+    private void loadData() {
+        if (dao == null) return;
+        try {
+            model.setRowCount(0);
+            List<Guru> list = dao.findAll();
+            if (list != null) {
+                for (Guru g : list) {
+                    model.addRow(new Object[]{
+                        g.getIdGuru(),
+                        g.getNamaGuru(),
+                        g.getNotelpGuru(),
+                        g.getJabatan()
+                    });
+                }
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal mengambil data guru:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void filterTable(String q) {
+        if (dao == null) return;
+        try {
+            model.setRowCount(0);
+            List<Guru> list = dao.findAll();
+            if (list == null) return;
+            if (q.isEmpty()) {
+                for (Guru g : list) model.addRow(new Object[]{g.getIdGuru(), g.getNamaGuru(), g.getNotelpGuru(), g.getJabatan()});
+            } else {
+                String lower = q.toLowerCase();
+                for (Guru g : list) {
+                    if ((g.getNamaGuru()!=null && g.getNamaGuru().toLowerCase().contains(lower)) ||
+                        (g.getNotelpGuru()!=null && g.getNotelpGuru().toLowerCase().contains(lower)) ||
+                        (g.getJabatan()!=null && g.getJabatan().toLowerCase().contains(lower))) {
+                        model.addRow(new Object[]{g.getIdGuru(), g.getNamaGuru(), g.getNotelpGuru(), g.getJabatan()});
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal mencari data guru:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     // =============================
     // METHOD BUAT TOMBOL STYLISH
+    // (sama persis)
     // =============================
-// =============================
-private JButton createButton(String text, Color color) {
-    JButton btn = new JButton(text) {
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    private JButton createButton(String text, Color color) {
+        JButton btn = new JButton(text) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            int width = getWidth();
-            int height = getHeight();
-            int arc = 22;
+                int width = getWidth();
+                int height = getHeight();
+                int arc = 22;
 
-            // ====== SOFT SHADOW (smooth gradation) ======
-            for (int i = 8; i >= 1; i--) {
-                float opacity = 0.03f * i; // makin lembut
-                g2.setColor(new Color(0, 0, 0, (int) (opacity * 255)));
-                g2.fillRoundRect(i, i + 3, width - (i * 2), height - (i * 2), arc, arc);
+                // ====== SOFT SHADOW (smooth gradation) ======
+                for (int i = 8; i >= 1; i--) {
+                    float opacity = 0.03f * i; // makin lembut
+                    g2.setColor(new Color(0, 0, 0, (int) (opacity * 255)));
+                    g2.fillRoundRect(i, i + 3, width - (i * 2), height - (i * 2), arc, arc);
+                }
+
+                // ====== BUTTON BACKGROUND ======
+                g2.setColor(getBackground());
+                g2.fillRoundRect(0, 0, width - 4, height - 4, arc, arc);
+
+                // ====== TEKS ======
+                FontMetrics fm = g2.getFontMetrics();
+                int textWidth = fm.stringWidth(getText());
+                int textHeight = fm.getAscent();
+                g2.setColor(getForeground());
+                g2.drawString(getText(), (width - textWidth) / 2, (height + textHeight) / 2 - 3);
+
+                g2.dispose();
+            }
+        };
+
+        btn.setFocusPainted(false);
+        btn.setContentAreaFilled(false);
+        btn.setBorderPainted(false);
+        btn.setOpaque(false);
+        btn.setForeground(Color.WHITE);
+        btn.setBackground(color);
+        btn.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 15));
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(125, 44));
+
+        // ====== Efek hover lembut ======
+        btn.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                btn.setBackground(color.brighter());
             }
 
-            // ====== BUTTON BACKGROUND ======
-            g2.setColor(getBackground());
-            g2.fillRoundRect(0, 0, width - 4, height - 4, arc, arc);
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                btn.setBackground(color);
+            }
+        });
 
-            // ====== TEKS ======
-            FontMetrics fm = g2.getFontMetrics();
-            int textWidth = fm.stringWidth(getText());
-            int textHeight = fm.getAscent();
-            g2.setColor(getForeground());
-            g2.drawString(getText(), (width - textWidth) / 2, (height + textHeight) / 2 - 3);
-
-            g2.dispose();
-        }
-    };
-
-    btn.setFocusPainted(false);
-    btn.setContentAreaFilled(false);
-    btn.setBorderPainted(false);
-    btn.setOpaque(false);
-    btn.setForeground(Color.WHITE);
-    btn.setBackground(color);
-    btn.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 15));
-    btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-    btn.setPreferredSize(new Dimension(125, 44));
-
-    // ====== Efek hover lembut ======
-    btn.addMouseListener(new java.awt.event.MouseAdapter() {
-        @Override
-        public void mouseEntered(java.awt.event.MouseEvent evt) {
-            btn.setBackground(color.brighter());
-        }
-
-        @Override
-        public void mouseExited(java.awt.event.MouseEvent evt) {
-            btn.setBackground(color);
-        }
-    });
-
-    return btn;
-}
+        return btn;
+    }
 
     // =============================
     // BORDER ROUNDED UNTUK TEXTFIELD
+    // (sama persis)
     // =============================
     private static class RoundedBorder extends AbstractBorder {
         private final int radius;
@@ -195,4 +311,3 @@ private JButton createButton(String text, Color color) {
         }
     }
 }
-

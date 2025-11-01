@@ -168,7 +168,6 @@ public class editdatabarang extends JPanel {
 
                 JOptionPane.showMessageDialog(this, "✅ Perubahan disimpan.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
 
-                // kembali ke daftar barang (juga idealnya refresh di sana)
                 JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
                 if (frame instanceof uiresponsive.Mainmenu) {
                     ((uiresponsive.Mainmenu) frame).showDataBarangPanel();
@@ -513,6 +512,5 @@ public class editdatabarang extends JPanel {
         return id;
     }
 
-    // (tetap sediakan fallback mapping jika perlu, tapi DB lookup lebih andal)
    
 }
