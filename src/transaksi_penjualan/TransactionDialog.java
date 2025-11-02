@@ -6,10 +6,13 @@ import Helper.DatabaseHelper;
 import voucher.Voucher;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -21,12 +24,10 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * TransactionDialog - improved layout and picker (consistent weights)
+ * TransactionDialog - behavior preserved (sama seperti kode asli)
+ * UI diimplementasikan mengikuti style transaksipenjualan.java (rounded fields, kanan keranjang, kiri input)
  *
- * - "Pilih Barang" opens a modal dialog with a JTable (searchable)
- * - Cart columns: [id_detail (hidden), Kode Barang, Nama Barang, Harga, Jumlah, Subtotal]
- * - If same id_detail is added again, qty is merged (and validated against stock)
- * - Total / Kembalian update automatically
+ * Pastikan kelas DetailBarang, DetailBarangDAO, TransactionDAO, Voucher, DatabaseHelper, SaleItem ada di project.
  */
 public class TransactionDialog extends JDialog {
     private final String currentUserId;
@@ -37,27 +38,27 @@ public class TransactionDialog extends JDialog {
     private JLabel lblKasir;
     private JLabel lblTanggal;
 
-    // Left form
-    private JTextField txtBarcode = new JTextField();
-    private JTextField txtNamaBarang = new JTextField();
-    private JButton bPilihBarang = new JButton("Pilih...");
-    private JTextField txtHarga = new JTextField();
-    private JTextField txtJumlah = new JTextField();
-    private JTextField txtSubtotal = new JTextField();
-    private JButton bTambah = new JButton("Tambah");
+    // Left form (names preserved to keep logic same)
+    private JTextField txtBarcode = createRoundedField();
+    private JTextField txtNamaBarang = createRoundedField();
+    private JButton bPilihBarang = createButton("Pilih", new Color(255, 140, 0), 90, 46);
+    private JTextField txtHarga = createRoundedField();
+    private JTextField txtJumlah = createRoundedField();
+    private JTextField txtSubtotal = createRoundedField();
+    private JButton bTambah = createButton("Tambah", new Color(0, 180, 0), 120, 32);
 
     // Cart (right)
     private DefaultTableModel cartModel;
     private JTable tblCart;
 
     // Controls
-    private JButton bReset = new JButton("Reset");
-    private JButton bHapus = new JButton("Hapus");
+    private JButton bReset = createButton("Reset", new Color(255, 0, 0), 120, 45);
+    private JButton bHapus = createButton("Hapus", new Color(218, 165, 32), 120, 45);
     private JLabel lblTotalValue = new JLabel("0");
-    private JTextField txtUangBayar = new JTextField("0", 12);
+    private JTextField txtUangBayar = createRoundedField();
     private JLabel lblKembalian = new JLabel("0");
-    private JButton bBayar = new JButton("Bayar");
-    private JButton bCetak = new JButton("Cetak");
+    private JButton bBayar = createButton("Bayar", new Color(0, 200, 0), 120, 32);
+    private JButton bCetak = createButton("Cetak", new Color(0, 120, 215), 120, 32);
 
     // Voucher
     private JComboBox<String> cbVoucher;
@@ -84,189 +85,183 @@ public class TransactionDialog extends JDialog {
 
     private void initUI() {
         setLayout(new BorderLayout(8, 8));
-        setPreferredSize(new Dimension(920, 560));
+        setPreferredSize(new Dimension(980, 640));
+        setBackground(new Color(236, 236, 236));
 
-        // TOP: kode, kasir, tanggal
-        JPanel top = new JPanel(new GridBagLayout());
-        GridBagConstraints tgb = new GridBagConstraints();
-        tgb.insets = new Insets(6, 10, 6, 10);
-        tgb.anchor = GridBagConstraints.WEST;
+        // HEADER: tanggal (kanan)
+        JLabel tanggal = new JLabel(LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMMM yyyy")), SwingConstants.RIGHT);
+        tanggal.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        JPanel header = new JPanel(new BorderLayout());
+        header.setOpaque(false);
+        header.setBorder(new EmptyBorder(16, 20, 8, 20));
+        header.add(tanggal, BorderLayout.EAST);
+        add(header, BorderLayout.NORTH);
 
-        // Make top row expand nicely
-        tgb.gridx = 0; tgb.gridy = 0;
-        top.add(new JLabel("Kode Transaksi:"), tgb);
-        tgb.gridx = 1; tgb.weightx = 0.6; tgb.fill = GridBagConstraints.HORIZONTAL;
-        txtKodeTransaksi = new JTextField();
+        // CENTER: content dua kolom
+        JPanel content = new JPanel(new GridLayout(1, 2, 40, 0));
+        content.setOpaque(false);
+        content.setBorder(new EmptyBorder(6, 18, 18, 18));
+
+        // LEFT panel (input) - menggunakan null layout untuk meniru desain transaksipenjualan
+        JPanel leftPanel = new JPanel(null);
+        leftPanel.setOpaque(false);
+        int x = 0, y = 0, fieldW = 440, fieldH = 38, gapY = 70;
+
+        JLabel lblKode = makeLabel("Kode Transaksi:", x, y);
+        txtKodeTransaksi = makeField(x, y + 22, fieldW, fieldH);
         txtKodeTransaksi.setEditable(false);
         txtKodeTransaksi.setText(generateTransactionCode());
-        top.add(txtKodeTransaksi, tgb);
+        leftPanel.add(lblKode);
+        leftPanel.add(txtKodeTransaksi);
 
-        tgb.gridx = 2; tgb.weightx = 0; tgb.fill = GridBagConstraints.NONE;
-        top.add(new JLabel("Kasir:"), tgb);
-        tgb.gridx = 3; tgb.weightx = 0.4; tgb.fill = GridBagConstraints.HORIZONTAL;
-        lblKasir = new JLabel(currentUserName == null ? "-" : currentUserName);
-        top.add(lblKasir, tgb);
+        y += gapY;
+        JLabel lblNama = makeLabel("Nama Barang:", x, y);
+        txtNamaBarang.setBounds(x, y + 22, fieldW - 90, fieldH);
+        bPilihBarang.setBounds(x + fieldW - 80, y + 22, 90, 46);
+        leftPanel.add(lblNama);
+        leftPanel.add(txtNamaBarang);
+        leftPanel.add(bPilihBarang);
 
-        tgb.gridx = 0; tgb.gridy = 1; tgb.weightx = 0; tgb.fill = GridBagConstraints.NONE;
-        top.add(new JLabel("Tanggal:"), tgb);
-        tgb.gridx = 1; tgb.weightx = 1.0; tgb.fill = GridBagConstraints.HORIZONTAL;
-        lblTanggal = new JLabel(LocalDate.now().format(DateTimeFormatter.ISO_DATE));
-        top.add(lblTanggal, tgb);
+        y += gapY;
+        JLabel lblHarga = makeLabel("Harga/unit:", x, y);
+        txtHarga.setBounds(x, y + 22, fieldW, fieldH);
+        leftPanel.add(lblHarga);
+        leftPanel.add(txtHarga);
 
-        add(top, BorderLayout.NORTH);
+        y += gapY;
+        JLabel lblJumlah = makeLabel("Jumlah:", x, y);
+        txtJumlah.setBounds(x, y + 22, 120, fieldH);
+        leftPanel.add(lblJumlah);
+        leftPanel.add(txtJumlah);
 
-        // CENTER: left form + right cart
-        JPanel center = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 10, 8, 10);
-        gbc.fill = GridBagConstraints.BOTH;
-
-        // LEFT: form panel with titled border
-        JPanel left = new JPanel(new GridBagLayout());
-        left.setBorder(BorderFactory.createTitledBorder("Input Item"));
-        GridBagConstraints lf = new GridBagConstraints();
-        lf.insets = new Insets(6,6,6,6);
-        lf.anchor = GridBagConstraints.WEST;
-
-        // Layout pattern: label at gridx=0 (weightx=0), field at gridx=1 (weightx=1)
-        // Row: Barcode
-        lf.gridx = 0; lf.gridy = 0; lf.weightx = 0; lf.fill = GridBagConstraints.NONE;
-        left.add(new JLabel("Barcode"), lf);
-        lf.gridx = 1; lf.weightx = 1.0; lf.fill = GridBagConstraints.HORIZONTAL;
-        txtBarcode.setPreferredSize(new Dimension(300, txtBarcode.getPreferredSize().height));
-        left.add(txtBarcode, lf);
-
-        // Row: Nama Barang (field + pilih button)
-        lf.gridx = 0; lf.gridy = 1; lf.weightx = 0; lf.fill = GridBagConstraints.NONE;
-        left.add(new JLabel("Nama Barang"), lf);
-        lf.gridx = 1; lf.weightx = 1.0; lf.fill = GridBagConstraints.HORIZONTAL;
-        JPanel namaRow = new JPanel(new BorderLayout(6,0));
-        txtNamaBarang.setEditable(false);
-        txtNamaBarang.setPreferredSize(new Dimension(300, txtNamaBarang.getPreferredSize().height));
-        bPilihBarang.setPreferredSize(new Dimension(90, txtNamaBarang.getPreferredSize().height));
-        namaRow.add(txtNamaBarang, BorderLayout.CENTER);
-        namaRow.add(bPilihBarang, BorderLayout.EAST);
-        left.add(namaRow, lf);
-
-        // Row: Harga/unit
-        lf.gridx = 0; lf.gridy = 2; lf.weightx = 0; lf.fill = GridBagConstraints.NONE;
-        left.add(new JLabel("Harga/unit"), lf);
-        lf.gridx = 1; lf.weightx = 1.0; lf.fill = GridBagConstraints.HORIZONTAL;
-        txtHarga.setPreferredSize(new Dimension(300, txtHarga.getPreferredSize().height));
-        left.add(txtHarga, lf);
-
-        // Row: Jumlah
-        lf.gridx = 0; lf.gridy = 3; lf.weightx = 0; lf.fill = GridBagConstraints.NONE;
-        left.add(new JLabel("Jumlah"), lf);
-        lf.gridx = 1; lf.weightx = 1.0; lf.fill = GridBagConstraints.HORIZONTAL;
-        txtJumlah.setPreferredSize(new Dimension(120, txtJumlah.getPreferredSize().height));
-        left.add(txtJumlah, lf);
-
-        // Row: Subtotal
-        lf.gridx = 0; lf.gridy = 4; lf.weightx = 0; lf.fill = GridBagConstraints.NONE;
-        left.add(new JLabel("Subtotal"), lf);
-        lf.gridx = 1; lf.weightx = 1.0; lf.fill = GridBagConstraints.HORIZONTAL;
+        y += gapY;
+        JLabel lblSubtotal = makeLabel("Subtotal:", x, y);
+        txtSubtotal.setBounds(x, y + 22, 200, fieldH);
         txtSubtotal.setEditable(false);
-        txtSubtotal.setPreferredSize(new Dimension(200, txtSubtotal.getPreferredSize().height));
-        left.add(txtSubtotal, lf);
+        leftPanel.add(lblSubtotal);
+        leftPanel.add(txtSubtotal);
 
-        // Row: button add (aligned left of field)
-        lf.gridx = 1; lf.gridy = 5; lf.weightx = 0; lf.fill = GridBagConstraints.NONE;
-        bTambah.setPreferredSize(new Dimension(120, 32));
-        left.add(bTambah, lf);
+        // tombol Tambah
+        bTambah.setBounds(x, y + gapY + 12, fieldW + 10, 48);
+        leftPanel.add(bTambah);
 
-        // RIGHT: cart panel
-        JPanel right = new JPanel(new BorderLayout(6,6));
-        right.setBorder(BorderFactory.createTitledBorder("Keranjang"));
+        // RIGHT panel (cart & payment)
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setOpaque(false);
 
-        // cart model & table
+        // Cart table (with same columns as kode asli)
         cartModel = new DefaultTableModel(new Object[]{"ID Detail","Kode Barang","Nama Barang","Harga","Jumlah","Subtotal"}, 0) {
             @Override public boolean isCellEditable(int r,int c){ return false; }
         };
         tblCart = new JTable(cartModel);
         tblCart.setFillsViewportHeight(true);
-
-        // Configure table column widths and hide ID Detail
-        TableColumnModel cm = tblCart.getColumnModel();
-        if (cm.getColumnCount() > 0) {
-            cm.getColumn(0).setMinWidth(0);
-            cm.getColumn(0).setMaxWidth(0);
-            cm.getColumn(0).setPreferredWidth(0);
-            try {
-                cm.getColumn(1).setPreferredWidth(70);
-                cm.getColumn(2).setPreferredWidth(220);
-                cm.getColumn(3).setPreferredWidth(90);
-                cm.getColumn(4).setPreferredWidth(60);
-                cm.getColumn(5).setPreferredWidth(100);
-            } catch (Throwable ignore) {}
-        }
-
+        tblCart.setRowHeight(26);
+        tblCart.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         JScrollPane spCart = new JScrollPane(tblCart);
-        spCart.setPreferredSize(new Dimension(480, 320));
-        right.add(spCart, BorderLayout.CENTER);
+        spCart.setPreferredSize(new Dimension(520, 320));
+        spCart.setBorder(BorderFactory.createLineBorder(new Color(210,210,210), 2, true));
+        rightPanel.add(spCart);
 
-        // controls panel under cart
-        JPanel rightSouth = new JPanel(new GridBagLayout());
-        GridBagConstraints rs = new GridBagConstraints();
-        rs.insets = new Insets(6,6,6,6);
-        rs.fill = GridBagConstraints.HORIZONTAL;
+        // tombol bawah (Reset, Hapus)
+        JPanel tombolPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 8));
+        tombolPanel.setOpaque(false);
+        tombolPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        tombolPanel.add(bReset);
+        tombolPanel.add(bHapus);
+        rightPanel.add(tombolPanel);
 
-        rs.gridx = 0; rs.gridy = 0; rs.gridwidth = 1;
-        rightSouth.add(bReset, rs);
-        rs.gridx = 1; rs.gridy = 0;
-        rightSouth.add(bHapus, rs);
+        // voucher + total + bayar grid
+        JPanel grid = new JPanel(new GridBagLayout());
+        grid.setOpaque(false);
+        GridBagConstraints g = new GridBagConstraints();
+        g.insets = new Insets(6,6,6,6);
+        g.fill = GridBagConstraints.HORIZONTAL;
 
-        rs.gridx = 0; rs.gridy = 1; rs.gridwidth = 2;
+        g.gridx = 0; g.gridy = 0; g.gridwidth = 1;
+        grid.add(new JLabel("Voucher:"), g);
+        g.gridx = 1; g.gridy = 0;
         cbVoucher = new JComboBox<>();
         loadVouchers();
-        rightSouth.add(cbVoucher, rs);
+        cbVoucher.setPreferredSize(new Dimension(300, 36));
+        grid.add(cbVoucher, g);
 
-        rs.gridx = 0; rs.gridy = 2; rs.gridwidth = 1;
-        rightSouth.add(new JLabel("Harga Total:"), rs);
-        rs.gridx = 1; rs.gridy = 2;
+        g.gridx = 0; g.gridy = 1;
+        grid.add(new JLabel("Harga Total:"), g);
+        g.gridx = 1; g.gridy = 1;
         lblTotalValue.setOpaque(true);
         lblTotalValue.setBackground(Color.LIGHT_GRAY);
-        lblTotalValue.setBorder(BorderFactory.createEmptyBorder(4,6,4,6));
-        rightSouth.add(lblTotalValue, rs);
+        lblTotalValue.setBorder(BorderFactory.createEmptyBorder(6,8,6,8));
+        grid.add(lblTotalValue, g);
 
-        rs.gridx = 0; rs.gridy = 3;
-        rightSouth.add(new JLabel("Uang Dibayar:"), rs);
-        rs.gridx = 1; rs.gridy = 3;
+        g.gridx = 0; g.gridy = 2;
+        grid.add(new JLabel("Uang Dibayar:"), g);
+        g.gridx = 1; g.gridy = 2;
+        txtUangBayar.setText("0");
+        txtUangBayar.setPreferredSize(new Dimension(180, 36));
         JPanel bayarRow = new JPanel(new BorderLayout(6,0));
-        txtUangBayar.setPreferredSize(new Dimension(140, txtUangBayar.getPreferredSize().height));
+        bayarRow.setOpaque(false);
         bayarRow.add(txtUangBayar, BorderLayout.CENTER);
         bayarRow.add(bBayar, BorderLayout.EAST);
-        rightSouth.add(bayarRow, rs);
+        grid.add(bayarRow, g);
 
-        rs.gridx = 0; rs.gridy = 4;
-        rightSouth.add(new JLabel("Kembalian:"), rs);
-        rs.gridx = 1; rs.gridy = 4;
+        g.gridx = 0; g.gridy = 3;
+        grid.add(new JLabel("Kembalian:"), g);
+        g.gridx = 1; g.gridy = 3;
         lblKembalian.setOpaque(true);
         lblKembalian.setBackground(Color.LIGHT_GRAY);
-        lblKembalian.setBorder(BorderFactory.createEmptyBorder(4,6,4,6));
-        rightSouth.add(lblKembalian, rs);
+        lblKembalian.setBorder(BorderFactory.createEmptyBorder(6,8,6,8));
+        grid.add(lblKembalian, g);
 
-        rs.gridx = 0; rs.gridy = 5; rs.gridwidth = 2;
-        bCetak.setPreferredSize(new Dimension(120, 32));
-        rightSouth.add(bCetak, rs);
+        g.gridx = 0; g.gridy = 4; g.gridwidth = 2;
+        JPanel cetakRow = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        cetakRow.setOpaque(false);
+        bCetak.setPreferredSize(new Dimension(140, 36));
+        cetakRow.add(bCetak);
+        grid.add(cetakRow, g);
 
-        right.add(rightSouth, BorderLayout.SOUTH);
+        rightPanel.add(grid);
 
-        // Add left/right to center with weights so they expand nicely
-        gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0.42; gbc.weighty = 1.0;
-        center.add(left, gbc);
-        gbc.gridx = 1; gbc.gridy = 0; gbc.weightx = 0.58; gbc.weighty = 1.0;
-        center.add(right, gbc);
+        // tombol Selesai di bawah
+        JButton btnSelesai = createButton("Selesaikan Transaksi", new Color(0, 200, 0), 520, 52);
+        btnSelesai.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JPanel selesaiPanel = new JPanel();
+        selesaiPanel.setOpaque(false);
+        selesaiPanel.add(btnSelesai);
+        rightPanel.add(Box.createVerticalStrut(8));
+        rightPanel.add(selesaiPanel);
 
-        add(center, BorderLayout.CENTER);
+        // tambahkan kiri & kanan
+        content.add(leftPanel);
+        content.add(rightPanel);
+        add(content, BorderLayout.CENTER);
 
-        // ACTIONS
+        // hide ID detail column visually
+        SwingUtilities.invokeLater(() -> {
+            TableColumnModel cm = tblCart.getColumnModel();
+            if (cm.getColumnCount() > 0) {
+                cm.getColumn(0).setMinWidth(0);
+                cm.getColumn(0).setMaxWidth(0);
+                cm.getColumn(0).setPreferredWidth(0);
+            }
+            // set other preferred widths
+            try {
+                cm.getColumn(1).setPreferredWidth(80);
+                cm.getColumn(2).setPreferredWidth(240);
+                cm.getColumn(3).setPreferredWidth(90);
+                cm.getColumn(4).setPreferredWidth(60);
+                cm.getColumn(5).setPreferredWidth(110);
+            } catch (Throwable ignored) {}
+        });
+
+        // ACTIONS (sama seperti kode asli)
         bPilihBarang.addActionListener(e -> openPilihBarangDialog());
         bTambah.addActionListener(e -> onTambah());
         bReset.addActionListener(e -> onResetCart());
         bHapus.addActionListener(e -> onHapusSelected());
         bBayar.addActionListener(e -> onBayar());
         bCetak.addActionListener(e -> onCetak());
+        btnSelesai.addActionListener(e -> onBayar()); // selesaikan transaksi sama dengan Bayar
 
         // recalc subtotal when price or qty change
         DocumentListener recalc = new DocumentListener() {
@@ -285,8 +280,8 @@ public class TransactionDialog extends JDialog {
         });
 
         // double-click cart edits qty quickly
-        tblCart.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
+        tblCart.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent evt) {
                 if (evt.getClickCount() == 2) {
                     int r = tblCart.getSelectedRow();
                     if (r >= 0) {
@@ -302,7 +297,7 @@ public class TransactionDialog extends JDialog {
     private void openPilihBarangDialog() {
         try {
             List<DetailBarang> list = detailDao.findAll();
-            if (list.isEmpty()) {
+            if (list == null || list.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Tidak ada item di stock.", "Info", JOptionPane.INFORMATION_MESSAGE);
                 return;
             }
@@ -313,6 +308,7 @@ public class TransactionDialog extends JDialog {
 
             // search field
             JPanel top = new JPanel(new BorderLayout(6,6));
+            top.setBorder(new EmptyBorder(6,6,6,6));
             JTextField txtSearch = new JTextField();
             top.add(new JLabel("Cari (nama/barcode):"), BorderLayout.WEST);
             top.add(txtSearch, BorderLayout.CENTER);
@@ -334,7 +330,7 @@ public class TransactionDialog extends JDialog {
             tPick.setRowSorter(sorter);
 
             JScrollPane sp = new JScrollPane(tPick);
-            sp.setPreferredSize(new Dimension(640, 320));
+            sp.setPreferredSize(new Dimension(720, 360));
             dlg.add(sp, BorderLayout.CENTER);
 
             // buttons
@@ -395,77 +391,76 @@ public class TransactionDialog extends JDialog {
     }
 
     // ---------------- Cart operations ----------------
-   private void onTambah() {
-    try {
-        if (selectedDetail == null) {
-            JOptionPane.showMessageDialog(this, "Pilih barang dulu (tombol Pilih).");
-            return;
-        }
-
-        int stokAvailable = selectedDetail.getStok();
-        int qty;
+    private void onTambah() {
         try {
-            qty = Integer.parseInt(txtJumlah.getText().trim());
-        } catch (NumberFormatException nfe) {
-            JOptionPane.showMessageDialog(this, "Jumlah harus berupa angka bulat.", "Input error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        if (qty <= 0) { JOptionPane.showMessageDialog(this, "Qty harus > 0"); return; }
-
-        // check existing qty present in cart for same id_detail
-        int idDetail = selectedDetail.getId();
-        int existingQty = 0;
-        int rowFound = -1;
-        for (int i = 0; i < cartModel.getRowCount(); i++) {
-            int rId = Integer.parseInt(cartModel.getValueAt(i, 0).toString());
-            if (rId == idDetail) {
-                existingQty = Integer.parseInt(cartModel.getValueAt(i, 4).toString()); // jumlah column index 4
-                rowFound = i;
-                break;
+            if (selectedDetail == null) {
+                JOptionPane.showMessageDialog(this, "Pilih barang dulu (tombol Pilih).");
+                return;
             }
+
+            int stokAvailable = selectedDetail.getStok();
+            int qty;
+            try {
+                qty = Integer.parseInt(txtJumlah.getText().trim());
+            } catch (NumberFormatException nfe) {
+                JOptionPane.showMessageDialog(this, "Jumlah harus berupa angka bulat.", "Input error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (qty <= 0) { JOptionPane.showMessageDialog(this, "Qty harus > 0"); return; }
+
+            // check existing qty present in cart for same id_detail
+            int idDetail = selectedDetail.getId();
+            int existingQty = 0;
+            int rowFound = -1;
+            for (int i = 0; i < cartModel.getRowCount(); i++) {
+                int rId = Integer.parseInt(cartModel.getValueAt(i, 0).toString());
+                if (rId == idDetail) {
+                    existingQty = Integer.parseInt(cartModel.getValueAt(i, 4).toString()); // jumlah column index 4
+                    rowFound = i;
+                    break;
+                }
+            }
+            if ((long) existingQty + qty > stokAvailable) {
+                JOptionPane.showMessageDialog(this, "Total qty melewati stok tersedia (" + stokAvailable + ")", "Stok", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            BigDecimal harga = selectedDetail.getHargaJual() == null ? BigDecimal.ZERO : selectedDetail.getHargaJual();
+            BigDecimal sub = harga.multiply(BigDecimal.valueOf(qty));
+
+            if (rowFound >= 0) {
+                // merge: update jumlah & subtotal
+                int newQty = existingQty + qty;
+                BigDecimal newSub = harga.multiply(BigDecimal.valueOf(newQty));
+                cartModel.setValueAt(newQty, rowFound, 4);
+                cartModel.setValueAt(newSub.toPlainString(), rowFound, 5);
+            } else {
+                // add new row: columns [idDetail, kodeBarang, namaBarang, harga, jumlah, subtotal]
+                String kodeBarang = String.valueOf(selectedDetail.getIdBarang());
+                String nama = selectedDetail.getNamaBarang() == null ? "-" : selectedDetail.getNamaBarang();
+                cartModel.addRow(new Object[]{
+                        selectedDetail.getId(),
+                        kodeBarang,
+                        nama,
+                        harga.toPlainString(),
+                        qty,
+                        sub.toPlainString()
+                });
+            }
+
+            updateTotal();
+
+            // clear selection & inputs after adding
+            selectedDetail = null;
+            txtNamaBarang.setText("");
+            txtHarga.setText("");
+            txtJumlah.setText("");
+            txtSubtotal.setText("");
+            txtBarcode.requestFocusInWindow();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Gagal tambah item: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
-        if ((long) existingQty + qty > stokAvailable) {
-            JOptionPane.showMessageDialog(this, "Total qty melewati stok tersedia (" + stokAvailable + ")", "Stok", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        BigDecimal harga = selectedDetail.getHargaJual() == null ? BigDecimal.ZERO : selectedDetail.getHargaJual();
-        BigDecimal sub = harga.multiply(BigDecimal.valueOf(qty));
-
-        if (rowFound >= 0) {
-            // merge: update jumlah & subtotal
-            int newQty = existingQty + qty;
-            BigDecimal newSub = harga.multiply(BigDecimal.valueOf(newQty));
-            cartModel.setValueAt(newQty, rowFound, 4);
-            cartModel.setValueAt(newSub.toPlainString(), rowFound, 5);
-        } else {
-            // add new row: columns [idDetail, kodeBarang, namaBarang, harga, jumlah, subtotal]
-            String kodeBarang = String.valueOf(selectedDetail.getIdBarang());
-            String nama = selectedDetail.getNamaBarang() == null ? "-" : selectedDetail.getNamaBarang();
-            cartModel.addRow(new Object[]{
-                    selectedDetail.getId(),
-                    kodeBarang,
-                    nama,
-                    harga.toPlainString(),
-                    qty,
-                    sub.toPlainString()
-            });
-        }
-
-        updateTotal();
-
-        // === NEW: clear selection & input fields after adding to cart ===
-        selectedDetail = null;
-        txtNamaBarang.setText("");
-        txtHarga.setText("");
-        txtJumlah.setText("");
-        txtSubtotal.setText("");
-        txtBarcode.requestFocusInWindow(); // fokus kembali ke barcode (opsional)
-    } catch (Exception ex) {
-        JOptionPane.showMessageDialog(this, "Gagal tambah item: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
     }
-}
-
 
     private void editCartRowQty(int row) {
         try {
@@ -645,5 +640,76 @@ public class TransactionDialog extends JDialog {
             // fallback next = 1
         }
         return prefix + String.format("%04d", next);
+    }
+
+    // ================= UI helper methods (from transaksipenjualan style) =================
+    private JLabel makeLabel(String text, int x, int y) {
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lbl.setBounds(x, y, 200, 20);
+        return lbl;
+    }
+
+    private JTextField makeField(int x, int y, int w, int h) {
+        JTextField field = createRoundedField();
+        field.setBounds(x, y, w, h);
+        return field;
+    }
+
+    private static JTextField createRoundedField() {
+        JTextField field = new JTextField() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(Color.WHITE);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 15, 15);
+                g2.setColor(new Color(190, 190, 190));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 15, 15);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        field.setOpaque(false);
+        field.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        return field;
+    }
+
+    private static JButton createButton(String text, Color bgColor, int width, int height) {
+        JButton button = new JButton(text) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // soft shadow
+                g2.setColor(new Color(0, 0, 0, 40));
+                g2.fillRoundRect(3, 3, getWidth() - 3, getHeight() - 3, 20, 20);
+                g2.setColor(bgColor);
+                g2.fillRoundRect(0, 0, getWidth() - 6, getHeight() - 6, 20, 20);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        button.setFocusPainted(false);
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Segoe UI Semibold", Font.BOLD, 13));
+        button.setPreferredSize(new Dimension(width, height));
+        return button;
+    }
+
+    // =========== testing main (optional) ===========
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            JFrame f = new JFrame("Transaksi - Desain Baru (Dialog test)");
+            f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            f.setSize(1200, 760);
+            f.setLocationRelativeTo(null);
+            TransactionDialog dlg = new TransactionDialog(f, "user-1", "Admin");
+            dlg.setVisible(true);
+            System.exit(0);
+        });
     }
 }

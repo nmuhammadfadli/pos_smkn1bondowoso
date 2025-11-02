@@ -1,100 +1,303 @@
 package laporan;
 
+import transaksi_penjualan.TransactionDAO;
+import transaksi_penjualan.TransactionItem;
+import transaksi_penjualan.TransactionRecord;
+
 import java.awt.*;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.DefaultTableModel;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.text.DecimalFormat;
 
+/**
+ * laporanpenjualan - versi ringkas dengan card summary di kanan
+ * (card style disesuaikan seperti laporanpembelian)
+ */
 public class laporanpenjualan extends JPanel {
+    private final TransactionDAO txDao = new TransactionDAO();
+    private final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
+    private final DecimalFormat moneyFmt = new DecimalFormat("#,###");
+
+    // UI
+    private JTextField txtDari;
+    private JTextField txtSampai;
+    private DefaultTableModel modelTrans;
+    private JTable tabelTrans;
+
+    // summary value labels (references to value labels inside cards)
+    private JLabel lblTotalPendapatanValue;
+    private JLabel lblJumlahTransaksiValue;
+    private JLabel lblBarangTerjualValue;
+    private JLabel lblRataRataValue;
 
     public laporanpenjualan() {
         setLayout(new BorderLayout());
         setBackground(new Color(236,236,236));
 
-        // ===== HEADER =====
+        // HEADER
         JLabel title = new JLabel("Laporan Penjualan", SwingConstants.LEFT);
         title.setFont(new Font("Segoe UI Semibold", Font.BOLD, 22));
-        title.setBorder(new EmptyBorder(20, 40, 10, 0));
+        title.setBorder(new EmptyBorder(18, 24, 8, 0));
         add(title, BorderLayout.NORTH);
 
-        // ===== MAIN CONTENT =====
-        JPanel mainPanel = new JPanel(new BorderLayout(20, 0));
-        mainPanel.setBorder(new EmptyBorder(20, 40, 40, 40));
-        mainPanel.setOpaque(false);
+        // MAIN
+        JPanel main = new JPanel(new BorderLayout(16, 0));
+        main.setBorder(new EmptyBorder(12, 24, 18, 24));
+        main.setOpaque(false);
 
-        // ===== PANEL KIRI =====
-        JPanel leftPanel = new JPanel(new BorderLayout(0, 15));
-        leftPanel.setOpaque(false);
+        // LEFT: tabel transaksi (single table)
+        JPanel left = new JPanel(new BorderLayout(8,8));
+        left.setOpaque(false);
 
-        // === Filter tanggal + tombol filter ===
-        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
-        filterPanel.setOpaque(false);
-        JLabel lblDari = new JLabel("Dari:");
-        JLabel lblSampai = new JLabel("Sampai:");
-        JTextField txtDari = createDateField();
-        JTextField txtSampai = createDateField();
-        JButton btnFilter = createModernButton("Filter", new Color(0, 180, 0), 120, 40);
+        // filter bar
+        JPanel filter = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        filter.setOpaque(false);
+        filter.add(new JLabel("Dari:"));
+        txtDari = createDateField();
+        filter.add(txtDari);
+        filter.add(new JLabel("Sampai:"));
+        txtSampai = createDateField();
+        filter.add(txtSampai);
+        JButton bFilter = createModernButton("Filter", new Color(0,180,0), 100, 36);
+        JButton bRefresh = createModernButton("Refresh", new Color(33,150,243), 100, 36);
+        filter.add(bFilter);
+        filter.add(bRefresh);
 
-        filterPanel.add(lblDari);
-        filterPanel.add(txtDari);
-        filterPanel.add(lblSampai);
-        filterPanel.add(txtSampai);
-        filterPanel.add(btnFilter);
+        left.add(filter, BorderLayout.NORTH);
 
-        // === Tabel data penjualan ===
-        String[] kolom = {"Tanggal", "Kode Transaksi", "Nama Barang", "Jumlah", "Harga", "Total"};
-        DefaultTableModel model = new DefaultTableModel(kolom, 0);
-        JTable tabel = new JTable(model);
-        tabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        tabel.setRowHeight(28);
-        tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        // table columns
+        String[] cols = {"ID", "Kode Transaksi", "Tanggal", "Kasir", "Guru", "Total Harga", "Total Bayar", "Kembalian", "Metode"};
+        modelTrans = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r,int c){ return false; }
+        };
+        tabelTrans = new JTable(modelTrans);
+        tabelTrans.setRowHeight(26);
+        tabelTrans.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        tabelTrans.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        tabelTrans.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tabelTrans.setAutoResizeMode(JTable.AUTO_RESIZE_NEXT_COLUMN);
 
-        // Contoh data
-        model.addRow(new Object[]{"2025-10-01", "TRX001", "Beras Premium", 5, 60000, 300000});
-        model.addRow(new Object[]{"2025-10-02", "TRX002", "Minyak Goreng", 3, 45000, 135000});
-        model.addRow(new Object[]{"2025-10-03", "TRX003", "Gula Pasir", 4, 30000, 120000});
+        // hide ID column visually
+        tabelTrans.getColumnModel().getColumn(0).setMinWidth(0);
+        tabelTrans.getColumnModel().getColumn(0).setMaxWidth(0);
+        tabelTrans.getColumnModel().getColumn(0).setWidth(0);
 
-        JScrollPane scroll = new JScrollPane(tabel);
-        scroll.getViewport().setBackground(Color.WHITE);
-        scroll.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210), 2, true));
+        JScrollPane sp = new JScrollPane(tabelTrans);
+        sp.setPreferredSize(new Dimension(900, 420));
+        sp.setBorder(BorderFactory.createLineBorder(new Color(210,210,210), 2, true));
+        left.add(sp, BorderLayout.CENTER);
 
-        leftPanel.add(filterPanel, BorderLayout.NORTH);
-        leftPanel.add(scroll, BorderLayout.CENTER);
+        // RIGHT: ringkasan cards (desain seperti laporanpembelian)
+        JPanel right = new JPanel();
+        right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
+        right.setOpaque(false);
+        right.setPreferredSize(new Dimension(340, 0));
 
-        // ===== PANEL KANAN =====
-        JPanel rightPanel = new JPanel();
-        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
-        rightPanel.setOpaque(false);
-        rightPanel.setPreferredSize(new Dimension(340, 0));
+        // create card panels and extract value labels to update later
+        JPanel pTotal = createSummaryPanelWithLabel("Total Pendapatan", "Rp " + moneyFmt.format(0), new Color(255, 167, 38));
+        lblTotalPendapatanValue = findValueLabelInSummary(pTotal);
 
-        DecimalFormat df = new DecimalFormat("#,###");
+        JPanel pJumlah = createSummaryPanelWithLabel("Jumlah Transaksi", "0", new Color(76, 175, 80));
+        lblJumlahTransaksiValue = findValueLabelInSummary(pJumlah);
 
-        rightPanel.add(createSummaryPanel("Total Pendapatan", "Rp " + df.format(555000), new Color(255, 167, 38))); // Oren
-        rightPanel.add(Box.createVerticalStrut(15));
-        rightPanel.add(createSummaryPanel("Jumlah Transaksi", "3", new Color(76, 175, 80))); // Hijau
-        rightPanel.add(Box.createVerticalStrut(15));
-        rightPanel.add(createSummaryPanel("Barang Terjual", "12", new Color(244, 67, 54))); // Merah
-        rightPanel.add(Box.createVerticalStrut(15));
-        rightPanel.add(createSummaryPanel("Rata-rata Transaksi", "Rp " + df.format(185000), new Color(255, 235, 59))); // Kuning
+        JPanel pBarang = createSummaryPanelWithLabel("Barang Terjual", "0", new Color(244, 67, 54));
+        lblBarangTerjualValue = findValueLabelInSummary(pBarang);
 
-        // Gabungkan kiri dan kanan
-        mainPanel.add(leftPanel, BorderLayout.CENTER);
-        mainPanel.add(rightPanel, BorderLayout.EAST);
-        add(mainPanel, BorderLayout.CENTER);
+        JPanel pRata = createSummaryPanelWithLabel("Rata-rata Transaksi", "Rp " + moneyFmt.format(0), new Color(255, 167, 38));
+        lblRataRataValue = findValueLabelInSummary(pRata);
+
+        right.add(pTotal);
+        right.add(Box.createVerticalStrut(15));
+        right.add(pJumlah);
+        right.add(Box.createVerticalStrut(15));
+        right.add(pBarang);
+        right.add(Box.createVerticalStrut(15));
+        right.add(pRata);
+        right.add(Box.createVerticalStrut(15));
+
+        main.add(left, BorderLayout.CENTER);
+        main.add(right, BorderLayout.EAST);
+        add(main, BorderLayout.CENTER);
+
+        // listeners: filter & refresh
+        bFilter.addActionListener(e -> {
+            LocalDate d1 = parseDate(txtDari.getText().trim());
+            LocalDate d2 = parseDate(txtSampai.getText().trim());
+            if (txtDari.getText().trim().length() > 0 && d1 == null) {
+                JOptionPane.showMessageDialog(this, "Format 'Dari' salah. Gunakan yyyy-MM-dd", "Format tanggal", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (txtSampai.getText().trim().length() > 0 && d2 == null) {
+                JOptionPane.showMessageDialog(this, "Format 'Sampai' salah. Gunakan yyyy-MM-dd", "Format tanggal", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (d1 != null && d2 != null && d2.isBefore(d1)) {
+                JOptionPane.showMessageDialog(this, "'Sampai' tidak boleh sebelum 'Dari'.", "Rentang tanggal", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            loadTransactions(d1, d2);
+        });
+        bRefresh.addActionListener(e -> {
+            txtDari.setText("");
+            txtSampai.setText("");
+            loadTransactions(null, null);
+        });
+
+        // double-click opens detail dialog
+        tabelTrans.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                int r = tabelTrans.rowAtPoint(e.getPoint());
+                if (r < 0) return;
+                int modelRow = tabelTrans.convertRowIndexToModel(r);
+                if (e.getClickCount() == 2) {
+                    Object idObj = modelTrans.getValueAt(modelRow, 0);
+                    if (idObj != null) {
+                        long idTrans = Long.parseLong(idObj.toString());
+                        showTransactionItemsDialog(idTrans);
+                    }
+                }
+            }
+        });
+
+        // initial load
+        loadTransactions(null, null);
     }
 
-    // =================== HELPER METHODS ===================
+    // Load transactions, optionally filter by date range (inclusive)
+    private void loadTransactions(LocalDate dari, LocalDate sampai) {
+        try {
+            List<TransactionRecord> list = txDao.findAllTransactions();
+            modelTrans.setRowCount(0);
+            List<TransactionRecord> filtered = new ArrayList<>();
+            for (TransactionRecord tr : list) {
+                LocalDate tgl = parseDateSafe(tr.getTglTransaksi());
+                boolean include = true;
+                if (dari != null && (tgl == null || tgl.isBefore(dari))) include = false;
+                if (sampai != null && (tgl == null || tgl.isAfter(sampai))) include = false;
+                if (include) filtered.add(tr);
+            }
+
+            for (TransactionRecord tr : filtered) {
+                String th = tr.getTotalHarga() == null ? "0" : tr.getTotalHarga().toPlainString();
+                String tb = tr.getTotalBayar() == null ? "0" : tr.getTotalBayar().toPlainString();
+                String kb = tr.getKembalian() == null ? "0" : tr.getKembalian().toPlainString();
+                String kasir = tr.getNamaKasir() == null ? "-" : tr.getNamaKasir();
+                String guru = tr.getNamaGuru() == null ? "-" : tr.getNamaGuru();
+                modelTrans.addRow(new Object[]{
+                        tr.getIdTransaksi(),
+                        tr.getKodeTransaksi(),
+                        tr.getTglTransaksi(),
+                        kasir,
+                        guru,
+                        th, tb, kb,
+                        tr.getPaymentMethod()
+                });
+            }
+
+            // update summary
+            updateSummary(filtered);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Gagal load transaksi: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // summary calculation (uses findItemsByTransaction to count sold quantities)
+    private void updateSummary(List<TransactionRecord> transactions) {
+        try {
+            BigDecimal totalPendapatan = BigDecimal.ZERO;
+            int jumlahTrans = transactions.size();
+            long totalBarangTerjual = 0;
+
+            for (TransactionRecord tr : transactions) {
+                if (tr.getTotalHarga() != null) totalPendapatan = totalPendapatan.add(tr.getTotalHarga());
+                try {
+                    List<TransactionItem> items = txDao.findItemsByTransaction(tr.getIdTransaksi());
+                    for (TransactionItem it : items) totalBarangTerjual += it.getJumlahBarang();
+                } catch (Exception ignore) { }
+            }
+
+            lblTotalPendapatanValue.setText("Rp " + moneyFmt.format(totalPendapatan));
+            lblJumlahTransaksiValue.setText(String.valueOf(jumlahTrans));
+            lblBarangTerjualValue.setText(String.valueOf(totalBarangTerjual));
+            if (jumlahTrans == 0) lblRataRataValue.setText("Rp 0");
+            else lblRataRataValue.setText("Rp " + moneyFmt.format(totalPendapatan.divide(BigDecimal.valueOf(jumlahTrans)).longValue()));
+        } catch (Exception ex) {
+            lblTotalPendapatanValue.setText("Rp 0");
+            lblJumlahTransaksiValue.setText("0");
+            lblBarangTerjualValue.setText("0");
+            lblRataRataValue.setText("Rp 0");
+        }
+    }
+
+    // Show modal dialog listing items for given transaction id
+    private void showTransactionItemsDialog(long idTransaksi) {
+        try {
+            List<TransactionItem> items = txDao.findItemsByTransaction(idTransaksi);
+            JDialog dlg = new JDialog(SwingUtilities.getWindowAncestor(this) instanceof Frame ? (Frame) SwingUtilities.getWindowAncestor(this) : null,
+                    "Detail Barang - Transaksi " + idTransaksi, Dialog.ModalityType.APPLICATION_MODAL);
+            dlg.setLayout(new BorderLayout(8,8));
+
+            String[] cols = {"ID Detail","ID Barang","Nama Barang","Qty","Harga Unit","Subtotal"};
+            DefaultTableModel m = new DefaultTableModel(cols, 0) {
+                @Override public boolean isCellEditable(int r,int c){ return false; }
+            };
+            JTable t = new JTable(m);
+            t.setRowHeight(26);
+            t.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+            t.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            for (TransactionItem it : items) {
+                String harga = it.getHargaUnit() == null ? "0" : it.getHargaUnit().toPlainString();
+                String sub = it.getSubtotal() == null ? "0" : it.getSubtotal().toPlainString();
+                m.addRow(new Object[]{
+                        it.getIdDetailPenjualan(),
+                        it.getIdDetailBarang(),
+                        it.getNamaBarang(),
+                        it.getJumlahBarang(),
+                        harga,
+                        sub
+                });
+            }
+            // hide id detail col visually
+            t.getColumnModel().getColumn(0).setMinWidth(0);
+            t.getColumnModel().getColumn(0).setMaxWidth(0);
+            t.getColumnModel().getColumn(0).setWidth(0);
+
+            JScrollPane sp = new JScrollPane(t);
+            sp.setPreferredSize(new Dimension(760, 320));
+            sp.setBorder(BorderFactory.createLineBorder(new Color(200,200,200),1,true));
+            dlg.add(sp, BorderLayout.CENTER);
+
+            JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            JButton bClose = new JButton("Tutup");
+            bClose.addActionListener(e -> dlg.dispose());
+            btns.add(bClose);
+            dlg.add(btns, BorderLayout.SOUTH);
+
+            dlg.pack();
+            dlg.setLocationRelativeTo(this);
+            dlg.setVisible(true);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Gagal ambil detail: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // =================== UI helpers (cards like laporanpembelian) ===================
     private JTextField createDateField() {
-        JTextField field = new JTextField(10);
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(190, 190, 190), 1, true),
-                new EmptyBorder(5, 10, 5, 10)));
-        return field;
+        JTextField f = new JTextField(10);
+        f.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        f.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(190,190,190),1,true),
+                new EmptyBorder(4,8,4,8)));
+        return f;
     }
 
-    // Tombol modern dengan efek hover dan rounded
     private JButton createModernButton(String text, Color baseColor, int w, int h) {
         JButton btn = new JButton(text) {
             private boolean hovered = false;
@@ -110,33 +313,19 @@ public class laporanpenjualan extends JPanel {
                 setOpaque(false);
 
                 addMouseListener(new java.awt.event.MouseAdapter() {
-                    @Override
-                    public void mouseEntered(java.awt.event.MouseEvent evt) {
-                        hovered = true;
-                        repaint();
-                    }
-
-                    @Override
-                    public void mouseExited(java.awt.event.MouseEvent evt) {
-                        hovered = false;
-                        repaint();
-                    }
+                    @Override public void mouseEntered(java.awt.event.MouseEvent evt) { hovered = true; repaint(); }
+                    @Override public void mouseExited(java.awt.event.MouseEvent evt) { hovered = false; repaint(); }
                 });
             }
 
-            @Override
-            protected void paintComponent(Graphics g) {
+            @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
                 Color c = hovered ? baseColor.brighter() : baseColor;
                 g2.setColor(c);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 15, 15);
-
-                // Shadow tipis
-                g2.setColor(new Color(0, 0, 0, 40));
+                g2.setColor(new Color(0,0,0,40));
                 g2.fillRoundRect(2, 2, getWidth(), getHeight(), 15, 15);
-
                 super.paintComponent(g2);
                 g2.dispose();
             }
@@ -144,7 +333,7 @@ public class laporanpenjualan extends JPanel {
         return btn;
     }
 
-    private JPanel createSummaryPanel(String title, String value, Color color) {
+    private JPanel createSummaryPanelWithLabel(String title, String value, Color color) {
         JPanel outerPanel = new JPanel(new BorderLayout());
         outerPanel.setOpaque(false);
         outerPanel.setMaximumSize(new Dimension(340, 100));
@@ -169,7 +358,28 @@ public class laporanpenjualan extends JPanel {
         return outerPanel;
     }
 
-    // Panel Rounded dengan efek shadow ringan
+    // helper untuk mengambil JLabel value dari panel summary (karena desain return panel)
+    // Asumsi: struktur panel -> outerPanel -> RoundedPanel -> center component is JLabel value
+    private JLabel findValueLabelInSummary(JPanel summaryPanel) {
+        if (summaryPanel.getComponentCount() == 0) return new JLabel("");
+        Component c = summaryPanel.getComponent(0); // RoundedPanel
+        if (!(c instanceof JPanel)) return new JLabel("");
+        JPanel rp = (JPanel) c;
+        // cari JLabel dengan font size >= 20 (value label)
+        for (Component cc : rp.getComponents()) {
+            if (cc instanceof JLabel) {
+                JLabel jl = (JLabel) cc;
+                if (jl.getFont().getSize() >= 20) return jl;
+            }
+        }
+        // fallback: return first JLabel found
+        for (Component cc : rp.getComponents()) {
+            if (cc instanceof JLabel) return (JLabel) cc;
+        }
+        return new JLabel("");
+    }
+
+    // Panel Rounded dengan efek shadow lembut
     class RoundedPanel extends JPanel {
         private final int cornerRadius;
         private final Color backgroundColor;
@@ -199,13 +409,32 @@ public class laporanpenjualan extends JPanel {
         }
     }
 
-    // =================== TESTING FRAME ===================
+    // parse yyyy-MM-dd or take first 10 chars if datetime
+    private LocalDate parseDate(String s) {
+        if (s == null) return null;
+        s = s.trim();
+        if (s.isEmpty()) return null;
+        try {
+            return LocalDate.parse(s, ISO);
+        } catch (DateTimeParseException ex) {
+            if (s.length() >= 10) {
+                try { return LocalDate.parse(s.substring(0,10), ISO); } catch (Exception e) { return null; }
+            }
+            return null;
+        }
+    }
+
+    private LocalDate parseDateSafe(String s) { return parseDate(s); }
+
+    // quick testing
     public static void main(String[] args) {
-        JFrame frame = new JFrame("Laporan Penjualan");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1300, 750);
-        frame.setLocationRelativeTo(null);
-        frame.setContentPane(new laporanpenjualan());
-        frame.setVisible(true);
+        SwingUtilities.invokeLater(() -> {
+            JFrame f = new JFrame("Laporan Penjualan - Ringkas");
+            f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            f.setSize(1200, 700);
+            f.setLocationRelativeTo(null);
+            f.setContentPane(new laporanpenjualan());
+            f.setVisible(true);
+        });
     }
 }
