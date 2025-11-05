@@ -23,6 +23,7 @@ class page {
 
         public dashboard() {
         }
+
     }
     
 }

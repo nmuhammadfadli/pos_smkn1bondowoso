@@ -1,6 +1,9 @@
 package uiresponsive;
 
 import Helper.DatabaseHelper;
+import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import pengguna.Pengguna;
 import javax.swing.SwingUtilities;
 import javax.swing.JOptionPane;
@@ -10,8 +13,10 @@ import javax.swing.JOptionPane;
  */
 public class UIResponsive {
 
+    // simpan user login global (bisa diakses dari mana saja)
+    public static Pengguna currentUser;
+
     public static void main(String[] args) {
-        // 1) Inisialisasi database (jika gagal, tampilkan pesan dan keluar)
         try {
             DatabaseHelper.initDatabase();
         } catch (Exception ex) {
@@ -23,21 +28,22 @@ public class UIResponsive {
             System.exit(1);
         }
 
-        // 2) Jalankan UI di EDT
         SwingUtilities.invokeLater(() -> {
             LoginDialog login = new LoginDialog(null);
             login.setVisible(true);
 
             if (login.isSucceeded()) {
-                Pengguna user = login.getLoggedUser();
-                // buka MainFrame (sesuaikan konstruktor jika MainFrame memerlukan argumen lain)
-              
-                new Mainmenu().setVisible(true);
+                currentUser = login.getLoggedUser();
+                try {
+                    new Mainmenu().setVisible(true);
+                } catch (SQLException ex) {
+                    Logger.getLogger(UIResponsive.class.getName()).log(Level.SEVERE, null, ex);
+                }
             } else {
-                // jika login gagal/ditutup, keluar aplikasi
                 System.exit(0);
             }
         });
+        
     }
-
+    
 }

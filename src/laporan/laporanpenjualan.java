@@ -26,8 +26,9 @@ public class laporanpenjualan extends JPanel {
     private final DecimalFormat moneyFmt = new DecimalFormat("#,###");
 
     // UI
-    private JTextField txtDari;
-    private JTextField txtSampai;
+    private com.toedter.calendar.JDateChooser txtDari;
+    private com.toedter.calendar.JDateChooser txtSampai;
+
     private DefaultTableModel modelTrans;
     private JTable tabelTrans;
 
@@ -60,11 +61,17 @@ public class laporanpenjualan extends JPanel {
         JPanel filter = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         filter.setOpaque(false);
         filter.add(new JLabel("Dari:"));
-        txtDari = createDateField();
+        txtDari = new com.toedter.calendar.JDateChooser();
+        txtDari.setDateFormatString("yyyy-MM-dd");
+        txtDari.setPreferredSize(new Dimension(120, 28));
         filter.add(txtDari);
+
         filter.add(new JLabel("Sampai:"));
-        txtSampai = createDateField();
+        txtSampai = new com.toedter.calendar.JDateChooser();
+        txtSampai.setDateFormatString("yyyy-MM-dd");
+        txtSampai.setPreferredSize(new Dimension(120, 28));
         filter.add(txtSampai);
+
         JButton bFilter = createModernButton("Filter", new Color(0,180,0), 100, 36);
         JButton bRefresh = createModernButton("Refresh", new Color(33,150,243), 100, 36);
         filter.add(bFilter);
@@ -79,10 +86,13 @@ public class laporanpenjualan extends JPanel {
         };
         tabelTrans = new JTable(modelTrans);
         tabelTrans.setRowHeight(26);
-        tabelTrans.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
-        tabelTrans.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        tabelTrans.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        tabelTrans.setAutoResizeMode(JTable.AUTO_RESIZE_NEXT_COLUMN);
+        tabelTrans.setRowHeight(28);
+        tabelTrans.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
+        tabelTrans.getTableHeader().setBackground(new Color(60, 80, 120));
+        tabelTrans.getTableHeader().setForeground(Color.WHITE);
+        tabelTrans.setGridColor(new Color(230, 230, 230));
+        tabelTrans.setSelectionBackground(new Color(93, 173, 226));
+        tabelTrans.setSelectionForeground(Color.WHITE);
 
         // hide ID column visually
         tabelTrans.getColumnModel().getColumn(0).setMinWidth(0);
@@ -128,27 +138,24 @@ public class laporanpenjualan extends JPanel {
 
         // listeners: filter & refresh
         bFilter.addActionListener(e -> {
-            LocalDate d1 = parseDate(txtDari.getText().trim());
-            LocalDate d2 = parseDate(txtSampai.getText().trim());
-            if (txtDari.getText().trim().length() > 0 && d1 == null) {
-                JOptionPane.showMessageDialog(this, "Format 'Dari' salah. Gunakan yyyy-MM-dd", "Format tanggal", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            if (txtSampai.getText().trim().length() > 0 && d2 == null) {
-                JOptionPane.showMessageDialog(this, "Format 'Sampai' salah. Gunakan yyyy-MM-dd", "Format tanggal", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
+            LocalDate d1 = null, d2 = null;
+            if (txtDari.getDate() != null) d1 = txtDari.getDate().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            if (txtSampai.getDate() != null) d2 = txtSampai.getDate().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+
             if (d1 != null && d2 != null && d2.isBefore(d1)) {
                 JOptionPane.showMessageDialog(this, "'Sampai' tidak boleh sebelum 'Dari'.", "Rentang tanggal", JOptionPane.ERROR_MESSAGE);
                 return;
             }
+
             loadTransactions(d1, d2);
         });
+
         bRefresh.addActionListener(e -> {
-            txtDari.setText("");
-            txtSampai.setText("");
+            txtDari.setDate(null);
+            txtSampai.setDate(null);
             loadTransactions(null, null);
         });
+
 
         // double-click opens detail dialog
         tabelTrans.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -167,7 +174,12 @@ public class laporanpenjualan extends JPanel {
         });
 
         // initial load
-        loadTransactions(null, null);
+// initial load -> set tanggal hari ini
+LocalDate today = LocalDate.now();
+java.util.Date utilDate = java.sql.Date.valueOf(today);
+txtDari.setDate(utilDate);
+txtSampai.setDate(utilDate);
+loadTransactions(today, today);
     }
 
     // Load transactions, optionally filter by date range (inclusive)

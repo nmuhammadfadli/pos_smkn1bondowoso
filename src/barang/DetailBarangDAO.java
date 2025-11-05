@@ -50,61 +50,6 @@ public class DetailBarangDAO {
         }
         return null;
     }
-    
-    // di class DetailBarangDAO
-public DetailBarang findByBarcode(String barcode) throws Exception {
-    if (barcode == null) return null;
-    String sql =
-        "SELECT a.id_detail_barang, a.barcode, a.stok, a.harga_jual, a.tanggal_exp, " +
-        "a.id_barang, b.nama AS nama_barang, a.id_supplier, c.nama_supplier, a.id_detail_pembelian " +
-        "FROM detail_barang a " +
-        "LEFT JOIN barang b ON a.id_barang = b.id " +
-        "LEFT JOIN data_supplier c ON a.id_supplier = c.id_supplier " +
-        "WHERE a.barcode = ? LIMIT 1";
-
-    try (Connection conn = DatabaseHelper.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql)) {
-        ps.setString(1, barcode);
-        try (ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                DetailBarang d = new DetailBarang();
-                d.setId(rs.getInt("id_detail_barang"));
-                d.setBarcode(rs.getString("barcode"));
-                d.setStok(rs.getInt("stok"));
-
-                String hargaStr = rs.getString("harga_jual");
-                if (hargaStr == null || hargaStr.trim().isEmpty()) {
-                    d.setHargaJual(java.math.BigDecimal.ZERO);
-                } else {
-                    d.setHargaJual(new java.math.BigDecimal(hargaStr));
-                }
-
-                d.setTanggalExp(rs.getString("tanggal_exp"));
-
-                int idBarang = rs.getInt("id_barang");
-                if (rs.wasNull()) d.setIdBarang(0); else d.setIdBarang(idBarang);
-                d.setNamaBarang(rs.getString("nama_barang"));
-
-                int idSup = rs.getInt("id_supplier");
-                if (!rs.wasNull()) {
-                    try {
-                        DetailBarang.class.getMethod("setIdSupplier", Integer.class).invoke(d, idSup);
-                    } catch (NoSuchMethodException ignore) {
-                        // jika model pakai setter primitif, bisa diabaikan atau disesuaikan
-                    } catch (Exception ignore) {}
-                }
-
-                try { DetailBarang.class.getMethod("setNamaSupplier", String.class).invoke(d, rs.getString("nama_supplier")); } catch (NoSuchMethodException ignore) {}
-                Object idDetObj = rs.getObject("id_detail_pembelian");
-                try { DetailBarang.class.getMethod("setIdDetailPembelian", Integer.class).invoke(d, (Integer) idDetObj); } catch (NoSuchMethodException ignore) {}
-
-                return d;
-            }
-        }
-    }
-    return null;
-}
-
 
     /**
      * Ambil semua detail untuk satu barang (id_barang)

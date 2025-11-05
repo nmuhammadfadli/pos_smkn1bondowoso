@@ -5,10 +5,14 @@ import java.awt.event.*;
 import java.sql.SQLException;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+// [FIX] Tambahkan import untuk UI kustom
+import javax.swing.plaf.basic.BasicComboBoxUI;
+import javax.swing.DefaultListCellRenderer;
 
 /**
  * editdatapengguna - versi fungsional tanpa mengubah desain.
  * Hak akses sekarang dropdown: 0 = Admin, 1 = Kasir
+ * [FIX] Dropdown (JComboBox) distilasi agar rounded.
  */
 public class editdatapengguna extends JPanel {
 
@@ -19,7 +23,7 @@ public class editdatapengguna extends JPanel {
     private RoundedTextField fldAlamat;
     private RoundedTextField fldJabatan;
     private RoundedTextField fldNamaLengkap;
-    private JComboBox<String> cmbHakAkses;               // <-- dropdown
+    private RoundedComboBox<String> cmbHakAkses;  // [FIX] Diganti ke RoundedComboBox
     private RoundedTextField fldEmail;
     private RoundedTextField fldNotelp;
 
@@ -70,7 +74,7 @@ public class editdatapengguna extends JPanel {
         fldJabatan = addField(formPanel, gbc, 4, "Jabatan:");
         fldNamaLengkap = addField(formPanel, gbc, 5, "Nama Lengkap:");
         // Hak Akses: gantikan text field dengan combo box (tetap di posisi grid yang sama)
-        addHakAksesField(formPanel, gbc, 6, "Hak Akses:");
+        addHakAksesField(formPanel, gbc, 6, "Hak Akses:"); // [FIX] Method ini diubah
         fldEmail = addField(formPanel, gbc, 7, "Email:");
         fldNotelp = addField(formPanel, gbc, 8, "No. Telp:");
 
@@ -135,6 +139,7 @@ public class editdatapengguna extends JPanel {
         return field;
     }
 
+    // [FIX] Method ini diubah untuk menggunakan RoundedComboBox
     private void addHakAksesField(JPanel panel, GridBagConstraints gbc, int gridx, String labelText) {
         int row = gridx / 3;
         int col = gridx % 3;
@@ -147,11 +152,10 @@ public class editdatapengguna extends JPanel {
         JLabel label = new JLabel(labelText);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
-        // Combo: tampilkan teks ringkas, nilai di-map saat load/save
-        cmbHakAkses = new JComboBox<>(new String[] {"Admin (0)", "Kasir (1)"});
-        cmbHakAkses.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        cmbHakAkses.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
-        cmbHakAkses.setOpaque(false);
+        // [FIX] Ganti JComboBox standar dengan RoundedComboBox
+        cmbHakAkses = new RoundedComboBox<>(new String[] {"Admin (0)", "Kasir (1)"});
+        // Atur tinggi agar konsisten (TextField kustom Anda tingginya sekitar 38px)
+        cmbHakAkses.setPreferredSize(new Dimension(0, 38)); 
 
         fieldPanel.add(label, BorderLayout.NORTH);
         fieldPanel.add(cmbHakAkses, BorderLayout.CENTER);
@@ -252,7 +256,7 @@ public class editdatapengguna extends JPanel {
         }
     }
 
-    // === Rounded TextField & Button (preserve style) ===
+    // === Rounded TextField (Tidak berubah) ===
     class RoundedTextField extends JTextField {
         private int radius = 15;
         public RoundedTextField(int size) {
@@ -273,6 +277,7 @@ public class editdatapengguna extends JPanel {
         }
     }
 
+    // === Rounded Button (Tidak berubah) ===
     class RoundedButton extends JButton {
         private final Color backgroundColor;
         private final Color textColor;
@@ -303,6 +308,105 @@ public class editdatapengguna extends JPanel {
             int textY = (getHeight() + fm.getAscent()) / 2 - 3;
             g2.drawString(getText(), textX, textY);
             g2.dispose();
+        }
+    }
+    
+    // =======================================================
+    // [BARU] KELAS-KELAS UNTUK STILASI JCOMBOBOX
+    // =======================================================
+
+    /**
+     * 1. JComboBox Kustom
+     * Mengganti paintComponent agar latar belakangnya bulat putih.
+     */
+    class RoundedComboBox<E> extends JComboBox<E> {
+        private int radius = 15;
+
+        public RoundedComboBox(E[] items) {
+            super(items);
+            setOpaque(false);
+            setUI(new RoundedComboBoxUI()); // Terapkan UI kustom (untuk panah)
+            setRenderer(new RoundedListCellRenderer()); // Terapkan renderer kustom (untuk daftar popup)
+            setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0)); // Padding teks di dalam
+            setBackground(Color.WHITE); // Latar belakang
+            setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            
+            // Gambar latar belakang bulat putih
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
+            
+            // Gambar border abu-abu
+            g2.setColor(new Color(200, 200, 200));
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
+            
+            g2.dispose();
+            
+            // Penting: Panggil super.paintComponent setelahnya agar teks dll
+            // ter-render di atas latar belakang kustom kita.
+            // Tapi kita nonaktifkan setOpaque agar super tidak menimpa bg kita.
+            super.paintComponent(g);
+        }
+    }
+
+    /**
+     * 2. UI ComboBox Kustom
+     * Mengganti tombol panah standar.
+     */
+    class RoundedComboBoxUI extends BasicComboBoxUI {
+        
+        @Override
+        protected JButton createArrowButton() {
+            // Buat tombol flat sederhana dengan ikon panah
+            JButton button = new JButton("▼"); // Anda bisa ganti dengan icon jika mau
+            button.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 10)); // Padding kanan
+            button.setContentAreaFilled(false);
+            button.setFocusPainted(false);
+            button.setForeground(new Color(100, 100, 100)); // Warna panah
+            return button;
+        }
+
+        // Hapus latar belakang default (karena RoundedComboBox sudah mengecatnya)
+        @Override
+        public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
+            // Biarkan kosong
+        }
+        
+        // Pastikan border tidak digambar oleh UI delegate
+        @Override
+        protected Insets getInsets() {
+            return new Insets(0, 0, 0, 0); 
+        }
+    }
+
+    /**
+     * 3. Renderer Daftar Kustom
+     * Mengganti tampilan item di dalam daftar popup.
+     */
+    class RoundedListCellRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value,
+                                                    int index, boolean isSelected,
+                                                    boolean cellHasFocus) {
+            // Panggil super untuk mendapatkan JLabel standar
+            JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            
+            label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            label.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12)); // Padding item
+
+            if (isSelected) {
+                label.setBackground(new Color(90, 150, 255)); // Warna saat dipilih
+                label.setForeground(Color.WHITE);
+            } else {
+                label.setBackground(Color.WHITE); // Warna normal
+                label.setForeground(new Color(40, 40, 40));
+            }
+            return label;
         }
     }
 }

@@ -8,6 +8,7 @@ import javax.swing.border.EmptyBorder;
 
 /**
  * tambahdatapengguna - UI desain dipertahankan; sekarang berfungsi insert & update.
+ * [FIX] Menggunakan JComboBox untuk Hak Akses.
  */
 public class tambahdatapengguna extends JPanel {
 
@@ -18,7 +19,8 @@ public class tambahdatapengguna extends JPanel {
     private RoundedTextField txtAlamat;
     private RoundedTextField txtJabatan;
     private RoundedTextField txtNamaLengkap;
-    private RoundedTextField txtHakAkses;
+    // private RoundedTextField txtHakAkses; // [FIX] Diganti
+    private JComboBox<String> cmbHakAkses; // [FIX] Menjadi JComboBox
     private RoundedTextField txtEmail;
     private RoundedTextField txtNotelp;
 
@@ -68,7 +70,30 @@ public class tambahdatapengguna extends JPanel {
         txtAlamat = addField(formPanel, gbc, 3, "Alamat:");
         txtJabatan = addField(formPanel, gbc, 4, "Jabatan:");
         txtNamaLengkap = addField(formPanel, gbc, 5, "Nama Lengkap:");
-        txtHakAkses = addField(formPanel, gbc, 6, "Hak Akses:");
+        
+        // [FIX] Hapus baris ini:
+        // txtHakAkses = addField(formPanel, gbc, 6, "Hak Akses:");
+        
+        // [FIX] Tambahkan JComboBox Hak Akses secara manual
+        gbc.gridx = 6 % 3; // Kolom 0
+        gbc.gridy = 6 / 3; // Baris 2
+
+        JPanel hakAksesPanel = new JPanel(new BorderLayout(5, 5));
+        hakAksesPanel.setOpaque(false);
+        JLabel lblHakAkses = new JLabel("Hak Akses:");
+        lblHakAkses.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        // Buat ComboBox dengan opsi "Admin" (nilai 0) dan "Kasir" (nilai 1)
+        String[] hakAksesOptions = {"Admin", "Kasir"};
+        cmbHakAkses = new JComboBox<>(hakAksesOptions);
+        cmbHakAkses.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        // Atur tinggi agar konsisten (TextField kustom Anda tingginya sekitar 38px)
+        cmbHakAkses.setPreferredSize(new Dimension(0, 38)); 
+
+        hakAksesPanel.add(lblHakAkses, BorderLayout.NORTH);
+        hakAksesPanel.add(cmbHakAkses, BorderLayout.CENTER);
+        formPanel.add(hakAksesPanel, gbc);
+
         txtEmail = addField(formPanel, gbc, 7, "Email:");
         txtNotelp = addField(formPanel, gbc, 8, "No. Telp:");
 
@@ -137,7 +162,7 @@ public class tambahdatapengguna extends JPanel {
         txtAlamat.setText("");
         txtJabatan.setText("");
         txtNamaLengkap.setText("");
-        txtHakAkses.setText("");
+        cmbHakAkses.setSelectedIndex(0); // [FIX] Reset ke "Admin" (index 0)
         txtEmail.setText("");
         txtNotelp.setText("");
 
@@ -156,7 +181,15 @@ public class tambahdatapengguna extends JPanel {
             txtAlamat.setText(p.getAlamat());
             txtJabatan.setText(p.getJabatan());
             txtNamaLengkap.setText(p.getNamaLengkap());
-            txtHakAkses.setText(p.getHakAkses() == null ? "" : String.valueOf(p.getHakAkses()));
+            
+            // [FIX] Set ComboBox berdasarkan nilai 0 (Admin) atau 1 (Kasir)
+            Integer hakAksesVal = p.getHakAkses();
+            if (hakAksesVal != null && hakAksesVal == 1) {
+                cmbHakAkses.setSelectedItem("Kasir");
+            } else {
+                cmbHakAkses.setSelectedItem("Admin"); // Default ke Admin jika 0 atau null
+            }
+
             txtEmail.setText(p.getEmail());
             txtNotelp.setText(p.getNotelpPengguna());
         } catch (SQLException ex) {
@@ -176,7 +209,10 @@ public class tambahdatapengguna extends JPanel {
         String alamat = txtAlamat.getText().trim();
         String jabatan = txtJabatan.getText().trim();
         String namaLengkap = txtNamaLengkap.getText().trim();
-        String hakAksesStr = txtHakAkses.getText().trim();
+        
+        // [FIX] Ambil nilai String dari ComboBox
+        String hakAksesStr = (String) cmbHakAkses.getSelectedItem(); 
+        
         String email = txtEmail.getText().trim();
         String notelp = txtNotelp.getText().trim();
 
@@ -185,15 +221,14 @@ public class tambahdatapengguna extends JPanel {
             return;
         }
 
-        Integer hakAkses = null;
-        if (!hakAksesStr.isEmpty()) {
-            try {
-                hakAkses = Integer.parseInt(hakAksesStr);
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Hak Akses harus angka.", "Validasi", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
+        // [FIX] Konversi String ("Admin"/"Kasir") ke Integer (0/1)
+        Integer hakAkses;
+        if ("Kasir".equals(hakAksesStr)) {
+            hakAkses = 1;
+        } else {
+            hakAkses = 0; // Default ke Admin
         }
+        // [FIX] Hapus blok try-catch NumberFormat
 
         Pengguna p = new Pengguna();
         p.setUsername(username);
@@ -201,7 +236,7 @@ public class tambahdatapengguna extends JPanel {
         p.setAlamat(alamat);
         p.setJabatan(jabatan);
         p.setNamaLengkap(namaLengkap);
-        p.setHakAkses(hakAkses);
+        p.setHakAkses(hakAkses); // Simpan nilai 0 atau 1
         p.setEmail(email);
         p.setNotelpPengguna(notelp);
 

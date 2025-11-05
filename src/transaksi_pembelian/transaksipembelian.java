@@ -72,7 +72,7 @@ public class transaksipembelian extends JPanel {
         y += gapY;
         JLabel lblNama = makeLabel("Nama Barang:", x, y);
         JTextField txtNama = makeField(x, y + 22, fieldW - 90, fieldH);
-        JButton btnPilih = createButton("Pilih", new Color(30, 58, 128), 90, 46);
+        JButton btnPilih = createButton("Pilih", new Color(26, 97, 145), 90, 46);
         btnPilih.setBounds(x + fieldW - 80, y + 22, 90, 46);
         btnPilih.addActionListener(e -> new PilihBarangFrame(txtNama));
         leftPanel.add(lblNama);
@@ -82,7 +82,7 @@ public class transaksipembelian extends JPanel {
         y += gapY;
         JLabel lblNamasup = makeLabel("Nama Supplier:", x, y);
         JTextField txtNamasup = makeField(x, y + 22, fieldW - 90, fieldH);
-        JButton btnPilihsup = createButton("Pilih", new Color(30, 58, 128), 90, 46);
+        JButton btnPilihsup = createButton("Pilih", new Color(26, 97, 145), 90, 46);
         btnPilihsup.setBounds(x + fieldW - 80, y + 22, 90, 46);
         btnPilihsup.addActionListener(e -> new PilihSupplierFrame(txtNamasup));
         leftPanel.add(lblNamasup);
@@ -102,7 +102,7 @@ public class transaksipembelian extends JPanel {
         leftPanel.add(txtJumlah);
 
         // Tombol Masukkan Keranjang di bawah langsung
-        JButton btnKeranjang = createButton("Masukkan Keranjang", new Color(30, 58, 138), fieldW + 10, 55);
+        JButton btnKeranjang = createButton("Masukkan Keranjang", new Color(26, 97, 145), fieldW + 10, 55);
         btnKeranjang.setBounds(x, y + gapY + 15, fieldW + 10, 55);
         leftPanel.add(btnKeranjang);
 
@@ -117,7 +117,12 @@ public class transaksipembelian extends JPanel {
         JTable tabel = new JTable(model);
         tabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         tabel.setRowHeight(28);
-        tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
+        tabel.getTableHeader().setBackground(new Color(60, 80, 120));
+        tabel.getTableHeader().setForeground(Color.WHITE);
+        tabel.setGridColor(new Color(230, 230, 230));
+        tabel.setSelectionBackground(new Color(93, 173, 226));
+        tabel.setSelectionForeground(Color.WHITE);
         JScrollPane scroll = new JScrollPane(tabel);
         scroll.setAlignmentX(Component.CENTER_ALIGNMENT);
         scroll.setPreferredSize(new Dimension(520, 260));
@@ -128,8 +133,8 @@ public class transaksipembelian extends JPanel {
         // ---- Tombol Cancel & Reset ----
         JPanel tombolPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 10));
         tombolPanel.setOpaque(false);
-        JButton btnCancel = createButton("Cancel", new Color(194, 65, 12), 120, 45);
-        JButton btnReset = createButton("Reset", new Color(236, 28, 44), 120, 45);
+        JButton btnCancel = createButton("Cancel", new Color(155, 89, 182), 120, 45);
+        JButton btnReset = createButton("Reset", new Color(231, 76, 60), 120, 45);
         tombolPanel.add(btnCancel);
         tombolPanel.add(btnReset);
         tombolPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -161,16 +166,16 @@ public class transaksipembelian extends JPanel {
 
         // Labels
         JLabel lblMetode = new JLabel("Metode Bayar:");
-        lblMetode.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblMetode.setFont(new Font("Segoe UI", Font.PLAIN, 18));
         lblMetode.setForeground(Color.WHITE);
         JLabel lblTotal = new JLabel("Total Harga:");
-        lblTotal.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblTotal.setFont(new Font("Segoe UI", Font.PLAIN, 18));
         lblTotal.setForeground(Color.WHITE);
         JLabel lblJumlahBayar = new JLabel("Jumlah Bayar:");
-        lblJumlahBayar.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblJumlahBayar.setFont(new Font("Segoe UI", Font.PLAIN, 18));
         lblJumlahBayar.setForeground(Color.WHITE);
         JLabel lblKembali = new JLabel("Kembali:");
-        lblKembali.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblKembali.setFont(new Font("Segoe UI", Font.PLAIN, 18));
         lblKembali.setForeground(Color.WHITE);
 
         // Dropdown Metode Bayar
@@ -218,7 +223,7 @@ public class transaksipembelian extends JPanel {
         // Wrapper with subtle border (gives feeling of card/shadow)
         JPanel bayarWrapper = new JPanel();
         bayarWrapper.setLayout(new BoxLayout(bayarWrapper, BoxLayout.Y_AXIS));
-        bayarWrapper.setBackground(new Color(236, 28, 44));
+        bayarWrapper.setBackground(new Color(53, 67, 77));
         bayarWrapper.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createEmptyBorder(6, 6, 6, 6),
                 BorderFactory.createCompoundBorder(
@@ -232,7 +237,7 @@ public class transaksipembelian extends JPanel {
         rightPanel.add(bayarWrapper);
 
         // ==== TOMBOL SELESAIKAN TRANSAKSI ====
-        JButton btnSelesai = createButton("Selesaikan Transaksi", new Color(30, 58, 138), 520, 55);
+        JButton btnSelesai = createButton("Selesaikan Transaksi", new Color(26, 97, 145), 520, 55);
         btnSelesai.setAlignmentX(Component.CENTER_ALIGNMENT);
         JPanel selesaiPanel = new JPanel();
         selesaiPanel.setOpaque(false);
@@ -252,7 +257,6 @@ public class transaksipembelian extends JPanel {
                 return;
             }
 
-            // ambil selected barang id dari client property yang di-set oleh PilihBarangFrame
             Object selectedBarangIdObj = txtNama.getClientProperty("selectedBarangId");
             Object selectedDetailIdObj = txtNama.getClientProperty("selectedDetailId");
             if (selectedBarangIdObj == null) {

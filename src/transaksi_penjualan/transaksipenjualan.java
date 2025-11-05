@@ -23,18 +23,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
+import pengguna.Pengguna;
+import uiresponsive.UIResponsive;
 
-/**
- * transaksipenjualan - Panel bergaya, lengkap fungsi transaksi (sama seperti TransactionDialog)
- *
- * Gunakan di NetBeans 8.2; cukup masukkan file ini ke package transaksi_penjualan.
- */
+
 public class transaksipenjualan extends JPanel {
 
     // ==== DAO / helper ====
     private final DetailBarangDAO detailDao = new DetailBarangDAO();
     private final TransactionDAO txDao = new TransactionDAO();
+    private Pengguna user;
 
     // ==== kiri (input) ====
     private JTextField txtKode;
@@ -53,7 +53,7 @@ public class transaksipenjualan extends JPanel {
     private JTable tabel;
 
     // ==== pembayaran area ====
-    private JComboBox<String> cbVoucher;
+    // private JComboBox<String> cbVoucher; // [FIX] Dihapus karena tidak terpakai
     private JLabel lblTotal;
     private JTextField txtJumlahBayar;
     private JLabel lblKembali;
@@ -61,18 +61,14 @@ public class transaksipenjualan extends JPanel {
     private JButton btnReset;
     private JButton btnCancel;
     private JButton btnBayar; // optional (alias)
+    private JButton btnCetak; // [FIX] Tetap dideklarasikan di sini
 
     // ==== internal state ====
-    private DetailBarang selectedDetail = null;
+    private DetailBarang selectedDetail = null; // diisi saat picker memilih
     private Voucher[] vouchers = new Voucher[0];
 
-    // cache sederhana untuk mencegah duplicate lookup yang persis sama
-    private String lastBarcodeLookup = "";
-
-    // flag untuk mencegah document listener bereaksi saat kita setText programmatically
-    private volatile boolean suppressBarcodeLookup = false;
-
     public transaksipenjualan() {
+        this.user = UIResponsive.currentUser;
         setLayout(new BorderLayout());
         setBackground(new Color(236,236,236));
         initHeader();
@@ -84,15 +80,34 @@ public class transaksipenjualan extends JPanel {
         lblKembali.setText("0");
     }
 
-    private void initHeader() {
-        JLabel tanggal = new JLabel(LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMMM yyyy")), SwingConstants.RIGHT);
-        tanggal.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        JPanel header = new JPanel(new BorderLayout());
-        header.setOpaque(false);
-        header.setBorder(new EmptyBorder(20, 30, 0, 30));
-        header.add(tanggal, BorderLayout.EAST);
-        add(header, BorderLayout.NORTH);
-    }
+private void initHeader() {
+    String nama = (user != null && user.getNamaLengkap() != null)
+            ? user.getNamaLengkap()
+            : "Pengguna";
+
+    // Label sapaan
+    JLabel lblWelcome = new JLabel("👋 Selamat datang, " + nama + "!");
+    lblWelcome.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 16));
+
+    // Label tanggal
+    JLabel tanggal = new JLabel(
+            LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMMM yyyy")),
+            SwingConstants.RIGHT
+    );
+    tanggal.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+
+    // Panel header
+    JPanel header = new JPanel(new BorderLayout());
+    header.setOpaque(false);
+    header.setBorder(new EmptyBorder(20, 30, 0, 30));
+
+    // Tambahkan komponen ke sisi kiri dan kanan
+    header.add(lblWelcome, BorderLayout.WEST);
+    header.add(tanggal, BorderLayout.EAST);
+
+    add(header, BorderLayout.NORTH);
+}
+
 
     private void initContent() {
         JPanel content = new JPanel(new GridLayout(1, 2, 40, 0));
@@ -110,23 +125,17 @@ public class transaksipenjualan extends JPanel {
         txtKode.setEditable(false);
         leftPanel.add(lblKode);
         leftPanel.add(txtKode);
-
-        // ----------------------------
-        // BARCODE above Nama (user requested)
-        // ----------------------------
+        
         y += gapY;
         JLabel lblBarcode = makeLabel("Barcode:", x, y);
-        txtBarcode = makeField(x, y + 22, 200, fieldH);
-        txtBarcode.setVisible(true);
+        txtBarcode = makeField(x, y + 22, fieldW, fieldH);
         leftPanel.add(lblBarcode);
         leftPanel.add(txtBarcode);
 
-        // Nama Barang berada tepat di bawah barcode
-        y += gapY; // shift down for nama
+        
+        y += gapY;
         JLabel lblNama = makeLabel("Nama Barang:", x, y);
         txtNama = makeField(x, y + 22, fieldW - 90, fieldH);
-        txtNama.setEditable(false);
-        txtNama.setFocusable(false);
         btnPilihBarang = createButton("Pilih", new Color(255, 140, 0), 90, 46);
         btnPilihBarang.setBounds(x + fieldW - 80, y + 22, 90, 46);
         leftPanel.add(lblNama);
@@ -136,29 +145,18 @@ public class transaksipenjualan extends JPanel {
         y += gapY;
         JLabel lblHarga = makeLabel("Harga:", x, y);
         txtHarga = makeField(x, y + 22, fieldW, fieldH);
-        txtHarga.setEditable(false);
-        txtHarga.setFocusable(false);
         leftPanel.add(lblHarga);
         leftPanel.add(txtHarga);
 
         y += gapY;
-        JLabel lblVoucher = makeLabel("Voucher (jika ada):", x, y);
-        txtVoucher = makeField(x, y + 22, fieldW - 90, fieldH);
-        btnPilihVoucher = createButton("Pilih", new Color(255, 140, 0), 90, 46);
-        btnPilihVoucher.setBounds(x + fieldW - 80, y + 22, 90, 46);
-        leftPanel.add(lblVoucher);
-        leftPanel.add(txtVoucher);
-        leftPanel.add(btnPilihVoucher);
-
-        y += gapY;
         JLabel lblJumlah = makeLabel("Jumlah:", x, y);
-        txtJumlah = makeField(x, y + 22, 120, fieldH);
+        txtJumlah = makeField(x, y + 22, fieldW, fieldH);
         leftPanel.add(lblJumlah);
         leftPanel.add(txtJumlah);
 
         y += gapY;
         JLabel lblSub = makeLabel("Subtotal:", x, y);
-        txtSubtotal = makeField(x, y + 22, 200, fieldH);
+        txtSubtotal = makeField(x, y + 22, fieldW, fieldH);
         txtSubtotal.setEditable(false);
         leftPanel.add(lblSub);
         leftPanel.add(txtSubtotal);
@@ -181,7 +179,13 @@ public class transaksipenjualan extends JPanel {
         tabel = new JTable(model);
         tabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         tabel.setRowHeight(28);
-        tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
+        tabel.getTableHeader().setBackground(new Color(60, 80, 120));
+        tabel.getTableHeader().setForeground(Color.WHITE);
+        tabel.setGridColor(new Color(230, 230, 230));
+        tabel.setSelectionBackground(new Color(93, 173, 226));
+        tabel.setSelectionForeground(Color.WHITE);
+        
         JScrollPane scroll = new JScrollPane(tabel);
         scroll.setAlignmentX(Component.CENTER_ALIGNMENT);
         scroll.setPreferredSize(new Dimension(520, 260));
@@ -200,78 +204,142 @@ public class transaksipenjualan extends JPanel {
         tombolPanel.setBorder(new EmptyBorder(15,0,15,0));
         rightPanel.add(tombolPanel);
 
-        // Pembayaran panel (grid)
-        JPanel bayarPanel = new JPanel(new GridLayout(4,2,15,15));
+        // Panel pembayaran (grid 5x2)
+        JPanel bayarPanel = new JPanel(new GridLayout(5, 2, 15, 15));
         bayarPanel.setOpaque(false);
-        bayarPanel.setBorder(new EmptyBorder(0,0,15,0));
+        bayarPanel.setBorder(new EmptyBorder(0, 0, 15, 0));
+
+        JLabel lblVoucherLabel = new JLabel("Voucher (opsional):");
+        lblVoucherLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
         JLabel lblMetode = new JLabel("Metode Bayar:");
         lblMetode.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
         JLabel lblTotalLabel = new JLabel("Total Harga:");
         lblTotalLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
         JLabel lblJumlahBayarLabel = new JLabel("Jumlah Bayar:");
         lblJumlahBayarLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
         JLabel lblKembaliLabel = new JLabel("Kembali:");
         lblKembaliLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
         String[] metodeBayarOptions = {"Tunai", "Transfer Bank", "QRIS", "Debit"};
         JComboBox<String> cmbMetodeBayar = new JComboBox<>(metodeBayarOptions);
         cmbMetodeBayar.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        cmbMetodeBayar.setPreferredSize(new Dimension(200,35));
+        cmbMetodeBayar.setPreferredSize(new Dimension(200, 35));
 
-        cbVoucher = new JComboBox<>(); // (unused visually in this grid; we keep txtVoucher on left)
+        txtVoucher = new JTextField();
+        txtVoucher.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        txtVoucher.setEditable(false);
+        txtVoucher.setBackground(Color.WHITE);
+        txtVoucher.setPreferredSize(new Dimension(200, 35));
+        txtVoucher.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200,200,200)),
+            new EmptyBorder(6,8,6,8)
+        ));
+
+        // Tambahkan mouse listener biar kalau diklik buka frame voucher
+        txtVoucher.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                openPilihVoucherFrame(txtVoucher);
+            }
+        });
+
         lblTotal = new JLabel("0");
         lblTotal.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         lblTotal.setOpaque(true);
         lblTotal.setBackground(Color.LIGHT_GRAY);
-        lblTotal.setBorder(BorderFactory.createEmptyBorder(6,8,6,8));
+        lblTotal.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
 
         txtJumlahBayar = createRoundedField();
         txtJumlahBayar.setText("0");
+
         lblKembali = new JLabel("0");
+        lblKembali.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         lblKembali.setOpaque(true);
         lblKembali.setBackground(Color.LIGHT_GRAY);
-        lblKembali.setBorder(BorderFactory.createEmptyBorder(6,8,6,8));
+        lblKembali.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+
+        // Tambah ke grid berurutan: label – field
+        bayarPanel.add(lblVoucherLabel);
+        bayarPanel.add(txtVoucher);
 
         bayarPanel.add(lblMetode);
         bayarPanel.add(cmbMetodeBayar);
+
         bayarPanel.add(lblTotalLabel);
         bayarPanel.add(lblTotal);
+
         bayarPanel.add(lblJumlahBayarLabel);
         bayarPanel.add(txtJumlahBayar);
+
         bayarPanel.add(lblKembaliLabel);
         bayarPanel.add(lblKembali);
 
-        // wrapper card-like
+        // Wrapper card
         JPanel bayarWrapper = new JPanel();
         bayarWrapper.setLayout(new BoxLayout(bayarWrapper, BoxLayout.Y_AXIS));
-        bayarWrapper.setBackground(new Color(255,140,0));
+        bayarWrapper.setBackground(new Color(255, 140, 0));
         bayarWrapper.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEmptyBorder(6,6,6,6),
+                BorderFactory.createEmptyBorder(6, 6, 6, 6),
                 BorderFactory.createCompoundBorder(
-                        BorderFactory.createMatteBorder(1,1,3,3, new Color(230,230,230)),
-                        new EmptyBorder(12,12,12,12)
+                        BorderFactory.createMatteBorder(1, 1, 3, 3, new Color(230, 230, 230)),
+                        new EmptyBorder(12, 12, 12, 12)
                 )
         ));
         bayarWrapper.setAlignmentX(Component.CENTER_ALIGNMENT);
         bayarWrapper.add(bayarPanel);
-        bayarWrapper.setMaximumSize(new Dimension(520,220));
+        bayarWrapper.setMaximumSize(new Dimension(520, 250));
         rightPanel.add(bayarWrapper);
 
-        // Tombol selesai
-        btnSelesai = createButton("Selesaikan Transaksi", new Color(0,200,0), 520, 55);
-        btnSelesai.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JPanel selesaiPanel = new JPanel();
-        selesaiPanel.setOpaque(false);
-        selesaiPanel.add(btnSelesai);
-        rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(selesaiPanel);
+     // --- [FIX] Blok Tombol Selesai & Cetak ---
+// Variabel untuk layout tombol
+int totalLebarPanel = 520; // Lebar total area tombol
+int lebarSelesai = 350;   
+int lebarCetak = 120; // Lebar tombol cetak
+int jarak = 10; // Jarak antar tombol
+int tinggiTombol = 55; // Tinggi tombol
+
+// Tombol selesai
+btnSelesai = createButton("Selesaikan Transaksi", new Color(0, 200, 0), lebarSelesai, tinggiTombol);
+
+// Tombol cetak
+btnCetak = createButton("Cetak", new Color(0, 123, 255), lebarCetak, tinggiTombol);
+
+// --- Panel untuk menampung kedua tombol ---
+JPanel selesaiPanel = new JPanel();
+selesaiPanel.setOpaque(false);
+selesaiPanel.setLayout(new BorderLayout(10, 0)); // layout kiri-kanan
+
+// Tambahkan tombol ke posisi kiri dan kanan
+selesaiPanel.add(btnSelesai, BorderLayout.WEST);
+selesaiPanel.add(btnCetak, BorderLayout.EAST);
+
+// [FIX] Atur alignment & ukuran panel agar muncul di BoxLayout
+selesaiPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+selesaiPanel.setMaximumSize(new Dimension(totalLebarPanel + 50, tinggiTombol + 10)); 
+
+// Tambahkan ke panel utama
+rightPanel.add(Box.createVerticalStrut(10));
+rightPanel.add(selesaiPanel);
+rightPanel.add(Box.createVerticalStrut(10));
+
+
 
         // aksi tombol
         btnKeranjang.addActionListener(e -> onTambah());
-        btnCancel.addActionListener(e -> model.setRowCount(0));
-        btnReset.addActionListener(e -> resetFields());
+        
+        // [FIX] Tambahkan updateTotal() agar total harga ikut reset
+        btnCancel.addActionListener(e -> {
+            model.setRowCount(0);
+            updateTotal();
+        });
+        
+        btnReset.addActionListener(e -> resetFields()); // Method resetFields() sudah diperbaiki
         btnSelesai.addActionListener(e -> onBayar());
+        btnCetak.addActionListener(e -> onCetak()); // [FIX] Tambahkan action listener
 
         // double-click edit qty
         tabel.addMouseListener(new MouseAdapter() {
@@ -303,54 +371,12 @@ public class transaksipenjualan extends JPanel {
 
         // picker actions
         btnPilihBarang.addActionListener(e -> openPilihBarangFrame(txtNama));
-        btnPilihVoucher.addActionListener(e -> openPilihVoucherFrame(txtVoucher));
-
-        // --------- BARCODE: no debounce ----------
-        txtBarcode.addActionListener(evt -> {
-            String raw = txtBarcode.getText();
-            String code = raw == null ? "" : raw.replaceAll("\\p{C}", "").trim(); // remove control chars
-            if (!code.isEmpty()) {
-                performLookupBarcode(code);
-            }
-        });
-
-        // langsung lookup on every change (no debounce)
-        txtBarcode.getDocument().addDocumentListener(new DocumentListener() {
-            private void doLookup() {
-                if (suppressBarcodeLookup) return; // skip if we're programmatically setting text
-
-                String raw = txtBarcode.getText();
-                // hapus karakter kontrol / newline yang kadang dikirim scanner
-                String code = raw == null ? "" : raw.replaceAll("\\p{C}", "").trim();
-
-
-                // jika kosong -> clear selection & jangan panggil DB
-                if (code.isEmpty()) {
-                    lastBarcodeLookup = "";
-                    selectedDetail = null;
-                    txtNama.setText("");
-                    txtHarga.setText("");
-                    if (!txtJumlah.isFocusOwner()) txtJumlah.setText("");
-                    txtSubtotal.setText("");
-                    return;
-                }
-                // hindari lookup ulang kalau kode persis sama dengan terakhir dicari
-                if (code.equals(lastBarcodeLookup)) return;
-                lastBarcodeLookup = code;
-                performLookupBarcode(code);
-            }
-            @Override public void insertUpdate(DocumentEvent e) { doLookup(); }
-            @Override public void removeUpdate(DocumentEvent e) { doLookup(); }
-            @Override public void changedUpdate(DocumentEvent e) { doLookup(); }
-        });
-
-        // ----------------------------------------
 
         content.add(leftPanel);
         content.add(rightPanel);
         add(content, BorderLayout.CENTER);
 
-        // hide ID column visually and set initial focus to barcode
+        // hide ID column visually
         SwingUtilities.invokeLater(() -> {
             TableColumnModel cm = tabel.getColumnModel();
             if (cm.getColumnCount() > 0) {
@@ -358,12 +384,10 @@ public class transaksipenjualan extends JPanel {
                 cm.getColumn(0).setMaxWidth(0);
                 cm.getColumn(0).setPreferredWidth(0);
             }
-            // minta fokus ke barcode saat UI sudah siap
-            if (txtBarcode != null) txtBarcode.requestFocusInWindow();
         });
     }
 
-    // ========== Core behavior ==========
+    // ========== Core behavior (sama dengan TransactionDialog) ==========
 
     private void onTambah() {
         try {
@@ -423,28 +447,13 @@ public class transaksipenjualan extends JPanel {
 
             updateTotal();
 
-            // clear selection & inputs after adding — kosongkan barcode juga supaya operator bisa scan berikutnya
+            // clear selection & inputs after adding
             selectedDetail = null;
             txtNama.setText("");
             txtHarga.setText("");
             txtJumlah.setText("");
             txtSubtotal.setText("");
-            // kosongkan barcode agar siap untuk scan berikutnya (suppress listener sementara)
-            suppressBarcodeLookup = true;
-            try {
-                txtBarcode.setText("");
-                lastBarcodeLookup = "";
-            } finally {
-                suppressBarcodeLookup = false;
-            }
-
-            // kembali fokus ke barcode (pakai invokeLater supaya safe)
-            SwingUtilities.invokeLater(() -> {
-                if (txtBarcode != null) {
-                    txtBarcode.requestFocusInWindow();
-                    txtBarcode.selectAll();
-                }
-            });
+            txtBarcode.requestFocusInWindow();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Gagal tambah item: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -511,210 +520,209 @@ public class transaksipenjualan extends JPanel {
         }
     }
 
- private void onBayar() {
-    if (model.getRowCount() == 0) {
-        JOptionPane.showMessageDialog(this, "Keranjang kosong.");
-        return;
-    }
+    private void onBayar() {
+        if (model.getRowCount() == 0) { JOptionPane.showMessageDialog(this, "Keranjang kosong."); return; }
 
-    // kumpulkan items
-    List<SaleItem> items = new ArrayList<>();
-    try {
-        for (int i = 0; i < model.getRowCount(); i++) {
-            int idDetail = Integer.parseInt(model.getValueAt(i, 0).toString());
-            int qty = Integer.parseInt(model.getValueAt(i, 4).toString());
-            BigDecimal price = new BigDecimal(model.getValueAt(i, 3).toString());
-            items.add(new SaleItem(idDetail, qty, price));
-        }
-    } catch (Exception ex) {
-        JOptionPane.showMessageDialog(this, "Data keranjang rusak: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    // total transaksi
-    BigDecimal total;
-    try {
-        total = new BigDecimal(lblTotal.getText().trim().replace(",",""));
-    } catch (Exception ex) {
-        JOptionPane.showMessageDialog(this, "Total transaksi tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
-
-    // cari voucher (jika diisi)
-    Integer voucherId = null;
-    String kodeVoucher = txtVoucher.getText().trim();
-    if (!kodeVoucher.isEmpty()) {
-        for (Voucher v : vouchers) {
-            if (v != null && kodeVoucher.equals(v.getKode())) {
-                voucherId = v.getIdVoucher();
-                break;
+        List<SaleItem> items = new ArrayList<>();
+        try {
+            for (int i = 0; i < model.getRowCount(); i++) {
+                int idDetail = Integer.parseInt(model.getValueAt(i, 0).toString());
+                int qty = Integer.parseInt(model.getValueAt(i, 4).toString());
+                BigDecimal price = new BigDecimal(model.getValueAt(i, 3).toString());
+                items.add(new SaleItem(idDetail, qty, price));
             }
-        }
-    }
-
-    // parse jumlah bayar
-    BigDecimal cashPaid = BigDecimal.ZERO;
-    String bayarStr = txtJumlahBayar.getText().trim();
-    if (voucherId == null) {
-        // TANPA VOUCHER => harus bayar tunai dan tunai >= total
-        if (bayarStr.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Masukkan nominal pembayaran tunai. Jika ingin kredit, pilih voucher terlebih dahulu.", "Pembayaran", JOptionPane.WARNING_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Data keranjang rusak: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
+
+        Integer voucherId = null;
+        String kodeVoucher = txtVoucher.getText().trim();
+        if (!kodeVoucher.isEmpty()) {
+            for (Voucher v : vouchers) {
+                if (v != null && kodeVoucher.equals(v.getKode())) { voucherId = v.getIdVoucher(); break; }
+            }
+        }
+
+        BigDecimal cashPaid;
         try {
-            cashPaid = new BigDecimal(bayarStr.replace(",",""));
+            cashPaid = new BigDecimal(txtJumlahBayar.getText().trim().replace(",",""));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Format uang bayar tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        if (cashPaid.compareTo(total) < 0) {
-            JOptionPane.showMessageDialog(this, "Pembayaran tunai kurang. Jika ingin menyisakan hutang, pilih voucher terlebih dahulu.", "Pembayaran", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-    } else {
-        // DENGAN VOUCHER => boleh hutang => terima kosong atau nominal <= total
-        if (!bayarStr.isEmpty()) {
-            try {
-                cashPaid = new BigDecimal(bayarStr.replace(",",""));
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Format uang bayar tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            if (cashPaid.compareTo(BigDecimal.ZERO) < 0) {
-                JOptionPane.showMessageDialog(this, "Nominal bayar tidak boleh negatif.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-        } else {
-            cashPaid = BigDecimal.ZERO; // kosong dianggap 0 saat voucher dipakai
+
+        String kodeTrans = txtKode.getText();
+
+        try {
+            txDao.processSale(items, voucherId, cashPaid, kodeTrans, null); // ubah null ke user id bila perlu
+            JOptionPane.showMessageDialog(this, "Transaksi berhasil. Kode: " + kodeTrans, "Sukses", JOptionPane.INFORMATION_MESSAGE);
+
+            model.setRowCount(0);
+            updateTotal();
+            txtJumlahBayar.setText("0");
+            lblKembali.setText("0");
+            txtKode.setText(generateTransactionCode());
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Gagal memproses transaksi: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-
-    String kodeTrans = txtKode.getText();
-
-    try {
-        txDao.processSale(items, voucherId, cashPaid, kodeTrans, null); // ubah null ke user id bila perlu
-        JOptionPane.showMessageDialog(this, "Transaksi berhasil. Kode: " + kodeTrans, "Sukses", JOptionPane.INFORMATION_MESSAGE);
-
-        model.setRowCount(0);
-        updateTotal();
-        txtJumlahBayar.setText("0");
-        lblKembali.setText("0");
-        txtKode.setText(generateTransactionCode());
-
-        // reset field input juga (menyamakan perilaku sebelumnya)
-        resetFields();
-
-        // fokus kembali ke barcode setelah transaksi sukses
-        SwingUtilities.invokeLater(() -> {
-            if (txtBarcode != null) {
-                txtBarcode.requestFocusInWindow();
-                txtBarcode.selectAll();
-            }
-        });
-    } catch (Exception ex) {
-        JOptionPane.showMessageDialog(this, "Gagal memproses transaksi: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+    // [FIX] Method baru untuk tombol cetak
+    private void onCetak() {
+        // TODO: Implementasikan logika untuk mencetak struk di sini
+        // Anda mungkin ingin menyimpan kode transaksi terakhir setelah onBayar() berhasil
+        // String kodeTrans = txtKode.getText(); // Ini adalah kode transaksi BARU
+        
+        JOptionPane.showMessageDialog(this, "gass garap cetak wkwk.");
     }
-}
 
 
     // ========== Picker Frames ==========
-    private void openPilihBarangFrame(JTextField targetField) {
-        try {
-            List<DetailBarang> list = detailDao.findAll();
-            if (list == null || list.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Tidak ada item di stock.", "Info", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
 
-            JDialog dlg = new JDialog(
+private void openPilihBarangFrame(JTextField targetField) {
+    try {
+        List<DetailBarang> list = detailDao.findAll();
+        if (list == null || list.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Tidak ada item di stok.", "Info", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // Frame modern seperti pembelian
+        JDialog dlg = new JDialog(
                 SwingUtilities.getWindowAncestor(this),
                 "Pilih Barang",
                 Dialog.ModalityType.APPLICATION_MODAL
-            );
-            dlg.setLayout(new BorderLayout(8,8));
+        );
+        dlg.setSize(800, 500);
+        dlg.setLocationRelativeTo(this);
+        dlg.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 
-            JPanel top = new JPanel(new BorderLayout(6,6));
-            top.setBorder(new EmptyBorder(6,6,6,6));
-            JTextField txtSearch = new JTextField();
-            top.add(new JLabel("Cari (nama/barcode):"), BorderLayout.WEST);
-            top.add(txtSearch, BorderLayout.CENTER);
-            dlg.add(top, BorderLayout.NORTH);
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(new EmptyBorder(15, 15, 15, 15));
+        panel.setBackground(new Color(250, 250, 250));
 
-            DefaultTableModel pickModel = new DefaultTableModel(new Object[]{"ID Detail","Barcode","Nama Barang","Stok","Harga"},0){
-                @Override public boolean isCellEditable(int r,int c){ return false; }
-            };
-            for (DetailBarang d : list) {
-                String nama = d.getNamaBarang() == null ? "-" : d.getNamaBarang();
-                String harga = d.getHargaJual() == null ? "0" : d.getHargaJual().toPlainString();
-                pickModel.addRow(new Object[]{ d.getId(), d.getBarcode() == null ? "-" : d.getBarcode(), nama, d.getStok(), harga});
+        // Panel atas - search bar
+        JPanel searchPanel = new JPanel(new BorderLayout(8, 8));
+        searchPanel.setOpaque(false);
+        JTextField txtSearch = new JTextField();
+        JButton btnSearch = new JButton("Cari");
+        styleButton(btnSearch, new Color(255, 140, 0));
+
+        searchPanel.add(new JLabel("Cari Barang:"), BorderLayout.WEST);
+        searchPanel.add(txtSearch, BorderLayout.CENTER);
+        searchPanel.add(btnSearch, BorderLayout.EAST);
+        panel.add(searchPanel, BorderLayout.NORTH);
+
+        // Tabel barang
+        String[] kolom = {"ID Detail", "Barcode", "Nama Barang", "Stok", "Harga"};
+        DefaultTableModel model = new DefaultTableModel(kolom, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        for (DetailBarang d : list) {
+            model.addRow(new Object[]{
+                    d.getId(),
+                    d.getBarcode() == null ? "-" : d.getBarcode(),
+                    d.getNamaBarang() == null ? "-" : d.getNamaBarang(),
+                    d.getStok(),
+                    d.getHargaJual() == null ? "0" : d.getHargaJual().toPlainString()
+            });
+        }
+
+        JTable tabel = new JTable(model);
+        tabel.setRowHeight(26);
+        tabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        tabel.getTableHeader().setBackground(new Color(240, 240, 240));
+        tabel.setFillsViewportHeight(true);
+
+        TableRowSorter<TableModel> sorter = new TableRowSorter<>(model);
+        tabel.setRowSorter(sorter);
+
+        JScrollPane scroll = new JScrollPane(tabel);
+        panel.add(scroll, BorderLayout.CENTER);
+
+        // Filter real-time di search
+        txtSearch.getDocument().addDocumentListener(new DocumentListener() {
+            void filter() {
+                String q = txtSearch.getText().trim();
+                if (q.isEmpty()) sorter.setRowFilter(null);
+                else sorter.setRowFilter(RowFilter.regexFilter("(?i)" + Pattern.quote(q)));
+            }
+            @Override public void insertUpdate(DocumentEvent e) { filter(); }
+            @Override public void removeUpdate(DocumentEvent e) { filter(); }
+            @Override public void changedUpdate(DocumentEvent e) { filter(); }
+        });
+
+        // Panel tombol bawah
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        btnPanel.setOpaque(false);
+        JButton btnPilih = new JButton("Pilih");
+        JButton btnCancel = new JButton("Batal");
+        styleButton(btnPilih, new Color(0, 180, 0));
+        styleButton(btnCancel, new Color(220, 0, 0));
+        btnPanel.add(btnPilih);
+        btnPanel.add(btnCancel);
+        panel.add(btnPanel, BorderLayout.SOUTH);
+
+        // Aksi tombol
+        btnCancel.addActionListener(e -> dlg.dispose());
+
+        // ==========================================================
+        // [PERBAIKAN BUG]
+        // ==========================================================
+        btnPilih.addActionListener(e -> {
+            int row = tabel.getSelectedRow();
+            if (row < 0) {
+                JOptionPane.showMessageDialog(dlg, "Pilih dulu barangnya!", "Info", JOptionPane.WARNING_MESSAGE);
+                return;
             }
 
-            JTable tPick = new JTable(pickModel);
-            tPick.setFillsViewportHeight(true);
-            TableRowSorter<javax.swing.table.TableModel> sorter = new TableRowSorter<>(pickModel);
-            tPick.setRowSorter(sorter);
+            int modelRow = tabel.convertRowIndexToModel(row);
+            int idDetail = (Integer) model.getValueAt(modelRow, 0);
 
-            JScrollPane sp = new JScrollPane(tPick);
-            sp.setPreferredSize(new Dimension(720,360));
-            dlg.add(sp, BorderLayout.CENTER);
-
-            JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-            JButton ok = new JButton("OK");
-            JButton cancel = new JButton("Cancel");
-            btns.add(ok); btns.add(cancel);
-            dlg.add(btns, BorderLayout.SOUTH);
-
-            txtSearch.getDocument().addDocumentListener(new DocumentListener() {
-                void filter() {
-                    String q = txtSearch.getText().trim();
-                    if (q.isEmpty()) sorter.setRowFilter(null);
-                    else sorter.setRowFilter(RowFilter.regexFilter("(?i)"+ Pattern.quote(q)));
+            // [FIX] Targetkan variabel 'selectedDetail' milik class transaksipenjualan
+            transaksipenjualan.this.selectedDetail = null;
+            for (DetailBarang d : list) {
+                if (d.getId() == idDetail) {
+                    // [FIX] Isi variabel class, bukan lokal
+                    transaksipenjualan.this.selectedDetail = d; 
+                    break;
                 }
-                @Override public void insertUpdate(DocumentEvent e) { filter(); }
-                @Override public void removeUpdate(DocumentEvent e) { filter(); }
-                @Override public void changedUpdate(DocumentEvent e) { filter(); }
-            });
+            }
+            
+            // [FIX] Cek variabel class
+            if (transaksipenjualan.this.selectedDetail != null) { 
+                // Buat variabel lokal di sini agar lebih rapi
+                DetailBarang selected = transaksipenjualan.this.selectedDetail;
+                
+                txtBarcode.setText(selected.getBarcode() == null ? "" : selected.getBarcode());
+                txtNama.setText(selected.getNamaBarang() == null ? "" : selected.getNamaBarang());
+                txtHarga.setText(selected.getHargaJual() == null ? "0" : selected.getHargaJual().toPlainString());
+                txtJumlah.setText("1");
+                recalcSubtotal();
+            }
 
-            ok.addActionListener(ae -> {
-                int sel = tPick.getSelectedRow();
-                if (sel < 0) { JOptionPane.showMessageDialog(dlg,"Pilih baris dulu."); return; }
-                int modelRow = tPick.convertRowIndexToModel(sel);
-                int idDetail = (Integer) pickModel.getValueAt(modelRow, 0);
-                selectedDetail = null;
-                for (DetailBarang d : list) { if (d.getId() == idDetail) { selectedDetail = d; break; } }
-                if (selectedDetail != null) {
-                    // suppress listener saat kita setText programmatically
-                    String barcodeVal = selectedDetail.getBarcode()==null?"":selectedDetail.getBarcode().replaceAll("\\p{C}", "").trim();
-                    suppressBarcodeLookup = true;
-                    try {
-                        txtBarcode.setText(barcodeVal);
-                        txtNama.setText(selectedDetail.getNamaBarang()==null?"":selectedDetail.getNamaBarang());
-                        txtHarga.setText(selectedDetail.getHargaJual()==null?"0":selectedDetail.getHargaJual().toPlainString());
-                        lastBarcodeLookup = barcodeVal; // keep cache in sync
-                        recalcSubtotal();
-                        // set caret to end so operator can continue typing/scanning
-                        txtBarcode.setCaretPosition(txtBarcode.getText().length());
-                    } finally {
-                        suppressBarcodeLookup = false;
-                    }
-                }
-                dlg.dispose();
-                // fokus kembali ke barcode setelah dialog tertutup
-                SwingUtilities.invokeLater(() -> {
-                    if (txtBarcode != null) txtBarcode.requestFocusInWindow();
-                });
-            });
+            dlg.dispose();
+        });
+        // ==========================================================
+        // AKHIR PERBAIKAN BUG
+        // ==========================================================
 
-            cancel.addActionListener(ae -> dlg.dispose());
 
-            dlg.pack();
-            dlg.setLocationRelativeTo(this);
-            dlg.setVisible(true);
+        btnSearch.addActionListener(e -> {
+            String q = txtSearch.getText().trim();
+            if (q.isEmpty()) sorter.setRowFilter(null);
+            else sorter.setRowFilter(RowFilter.regexFilter("(?i)" + Pattern.quote(q)));
+        });
 
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Gagal buka picker: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        dlg.add(panel);
+        dlg.setVisible(true);
+
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, "Gagal buka picker: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
     }
+}
 
     private void openPilihVoucherFrame(JTextField targetField) {
         try {
@@ -727,7 +735,7 @@ public class transaksipenjualan extends JPanel {
             SwingUtilities.getWindowAncestor(this),
             "Pilih Voucher",
             Dialog.ModalityType.APPLICATION_MODAL
-        );
+            );
             dlg.setSize(650,450);
             dlg.setLocationRelativeTo(this);
 
@@ -744,10 +752,14 @@ public class transaksipenjualan extends JPanel {
             searchPanel.add(btnSearch, BorderLayout.EAST);
             panel.add(searchPanel, BorderLayout.NORTH);
 
-            String[] kolom = {"Kode Voucher","Nominal", "Guru"};
+            // [FIX] Hapus kolom "Guru" agar sesuai dengan data yang di-add
+            String[] kolom = {"Kode Voucher","Nominal"};
             DefaultTableModel m = new DefaultTableModel(kolom,0);
             for (Voucher v : list) {
-                m.addRow(new Object[]{ v.getKode(), v.getCurrentBalance()==null?"0":v.getCurrentBalance().toPlainString()});
+                m.addRow(new Object[]{ 
+                    v.getKode(), 
+                    v.getCurrentBalance()==null?"0":v.getCurrentBalance().toPlainString()
+                });
             }
             JTable t = new JTable(m);
             t.setRowHeight(26);
@@ -787,17 +799,14 @@ public class transaksipenjualan extends JPanel {
             List<Voucher> list = DatabaseHelper.getAllVouchers();
             if (list == null) list = new ArrayList<>();
             vouchers = new Voucher[list.size()];
-            cbVoucher = new JComboBox<>();
-            cbVoucher.addItem("- Tidak pakai voucher -");
+            // [FIX] Hapus kode cbVoucher yang tidak terpakai
             int i = 0;
             for (Voucher v : list) {
                 vouchers[i] = v;
-                String lbl = v.getKode() + " (saldo: " + (v.getCurrentBalance() == null ? "0" : v.getCurrentBalance().toPlainString()) + ")";
-                cbVoucher.addItem(lbl);
                 i++;
             }
         } catch (Exception ex) {
-            cbVoucher = new JComboBox<>(new String[]{"- Tidak pakai voucher -"});
+            // [FIX] Hapus kode cbVoucher yang tidak terpakai
             vouchers = new Voucher[0];
         }
     }
@@ -889,91 +898,30 @@ public class transaksipenjualan extends JPanel {
         return prefix + String.format("%04d", next);
     }
 
+    // [FIX] Method ini diubah jadi "Reset Total Transaksi"
     private void resetFields() {
-        txtKode.setText("");
+        // 1. Reset input barang
+        selectedDetail = null;
+        txtBarcode.setText("");
         txtNama.setText("");
         txtHarga.setText("");
-        txtVoucher.setText("");
         txtJumlah.setText("");
         txtSubtotal.setText("");
-        // keep barcode cleared as well so operator can scan new item (suppress listener)
-        suppressBarcodeLookup = true;
-        try {
-            txtBarcode.setText("");
-            lastBarcodeLookup = "";
-        } finally {
-            suppressBarcodeLookup = false;
-        }
-    }
 
-    private void performLookupBarcode(String barcode) {
-       
-        new SwingWorker<DetailBarang, Void>() {
-            @Override
-            protected DetailBarang doInBackground() throws Exception {
-                if (barcode == null || barcode.trim().isEmpty()) return null;
-                try {
-                    return detailDao.findByBarcode(barcode.trim());
-                } catch (Exception ex) {
-                    throw ex;
-                }
-            }
+        // 2. Reset keranjang
+        model.setRowCount(0);
+        
+        // 3. Reset pembayaran
+        txtVoucher.setText("");
+        lblTotal.setText("0");
+        txtJumlahBayar.setText("0");
+        lblKembali.setText("0");
 
-            @Override
-            protected void done() {
-                try {
-                    DetailBarang d = get();
-                    if (d == null) {
-                        // barang tidak ditemukan: clear fields (jangan ganggu input barcode)
-                        selectedDetail = null;
-                        txtNama.setText("");
-                        txtHarga.setText("");
-                        // hanya kosongkan subtotal/jumlah bila user tidak sedang mengedit jumlah
-                        if (!txtJumlah.isFocusOwner()) txtJumlah.setText("");
-                        txtSubtotal.setText("");
-                        // keep focus on barcode and select all to allow quick re-scan
-                        lastBarcodeLookup = ""; // sinkronisasi cache
-                        SwingUtilities.invokeLater(() -> {
-                            if (txtBarcode != null) {
-                                txtBarcode.requestFocusInWindow();
-                                txtBarcode.selectAll();
-                            }
-                        });
-                    } else {
-                        selectedDetail = d;
-                        final String foundCode = d.getBarcode() == null ? "" : d.getBarcode().replaceAll("\\p{C}", "").trim();
+        // 4. Buat kode transaksi BARU
+        txtKode.setText(generateTransactionCode());
 
-                        // update UI on EDT and suppress document listener while setting txtBarcode
-                        SwingUtilities.invokeLater(() -> {
-                            suppressBarcodeLookup = true;
-                            try {
-                                txtBarcode.setText(foundCode);
-                                txtNama.setText(d.getNamaBarang() == null ? "" : d.getNamaBarang());
-                                txtHarga.setText(d.getHargaJual() == null ? "0" : d.getHargaJual().toPlainString());
-                                lastBarcodeLookup = foundCode; // keep cache consistent
-                                // Hanya set default qty = 1 jika field qty KOSONG.
-                                // Jangan overwrite jika operator sedang mengetik jumlah (isFocusOwner).
-//                                if (txtJumlah.getText().trim().isEmpty()) {
-//                                    txtJumlah.setText("1");
-//                                }
-                                recalcSubtotal();
-                                if (!txtJumlah.isFocusOwner()) {
-                                    txtJumlah.requestFocusInWindow();
-                                    txtJumlah.selectAll();
-                                }
-                            } finally {
-                                suppressBarcodeLookup = false;
-                            }
-                        });
-                    }
-                } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(transaksipenjualan.this, "Gagal cari barcode: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                    SwingUtilities.invokeLater(() -> {
-                        if (txtBarcode != null) { txtBarcode.requestFocusInWindow(); txtBarcode.selectAll(); }
-                    });
-                }
-            }
-        }.execute();
+        // 5. Fokus kembali ke barcode
+        txtBarcode.requestFocusInWindow();
     }
 
     // ====== Main testing ======

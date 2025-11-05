@@ -34,11 +34,16 @@ import pengguna.datapengguna;
 import pengguna.tambahdatapengguna;
 import pengguna.editdatapengguna;
 import hutang.datahutang;
+import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.swing.JOptionPane;
 import transaksi_penjualan.transaksipenjualan;
 import transaksi_pembelian.transaksipembelian;
 import kategori.datakategori;
 import laporan.laporanpenjualan;
 import laporan.laporanpembelian;
+import pengguna.Pengguna;
 import voucher.datavoucher;
 import voucher.editdatavoucher;
 import voucher.tambahdatavoucher;
@@ -73,13 +78,15 @@ private datavoucher datavoucherpanel;
 private tambahdatavoucher tambahdatavoucherpanel;
 private editdatavoucher editdatavoucherpanel;
   
-public Mainmenu() {
+public Mainmenu() throws SQLException {
     initComponents();
     setUndecorated(true);
+    setExtendedState(MAXIMIZED_BOTH);
+        applyAccessControl();
 
     // ====== DAFTAR TOMBOL YANG DIGUNAKAN SEKARANG ======
     javax.swing.JButton[] buttons = {
-        dashboardbtn, databarangbtn, datakategoribtn,datasupplierbtn, datagurubtn, datapenggunabtn, datahutangbtn, transaksipenjualanbtn, transaksipembelianbtn, laporanpenjualanbtn, laporanpembelianbtn, voucherbtn,keluarbtn
+        dashboardbtn, databarangbtn, datakategoribtn,datasupplierbtn, datagurubtn, datapenggunabtn, datahutangbtn, transaksipenjualanbtn, transaksipenjualanbtnkasir, transaksipembelianbtn, laporanpenjualanbtn, laporanpembelianbtn, voucherbtn,keluarbtn
     };
 
     // ====== SET ICON DEFAULT ======
@@ -91,6 +98,7 @@ public Mainmenu() {
     setButtonIcon(datapenggunabtn, "datapengguna.png");
     setButtonIcon(datahutangbtn, "datahutang.png");
     setButtonIcon(transaksipenjualanbtn, "transaksipenjualan.png");
+    setButtonIcon(transaksipenjualanbtnkasir, "transaksipenjualan.png");
     setButtonIcon(transaksipembelianbtn, "transaksipembelian.png");
     setButtonIcon(laporanpenjualanbtn, "laporanpenjualan.png");
     setButtonIcon(laporanpembelianbtn, "laporanpembelian.png");   
@@ -120,6 +128,7 @@ public Mainmenu() {
     tambahdatapenggunapanel = new tambahdatapengguna();
     editdatapenggunapanel = new editdatapengguna();
     datahutangpanel = new datahutang();
+
     transaksipenjualanpanel = new transaksipenjualan();
     transaksipembelianpanel = new transaksipembelian();
     datakategoripanel = new datakategori();
@@ -136,7 +145,45 @@ public Mainmenu() {
     page.revalidate();
     page.repaint();
 }
+/**
+ * [BARU] Method ini mengecek hak akses user dan menyembunyikan tombol
+ * yang tidak perlu.
+ */
+// Di dalam file Mainmenu.java
+// ...
 
+private void applyAccessControl() {
+    Pengguna user = UIResponsive.currentUser;
+
+    // [FIX] Tambahkan pengecekan null untuk mencegah crash
+    if (user == null) {
+        JOptionPane.showMessageDialog(this, 
+            "Gagal mendapatkan data user! Aplikasi akan ditutup.", 
+            "Error Kredensial", 
+            JOptionPane.ERROR_MESSAGE);
+        System.exit(0); // Tutup paksa jika user tidak ada
+        return; // Hentikan eksekusi method
+    }
+
+    // Kode Anda sebelumnya, sekarang aman dari NullPointerException
+    int hakAkses = user.getHakAkses(); 
+                
+    if (hakAkses == 1) { 
+        transaksipenjualanbtn.setVisible(false);
+        databarangbtn.setVisible(false);
+        datakategoribtn.setVisible(false);
+        datasupplierbtn.setVisible(false);
+        datagurubtn.setVisible(false);
+        datapenggunabtn.setVisible(false);
+        datahutangbtn.setVisible(false);
+        transaksipembelianbtn.setVisible(false);
+        laporanpenjualanbtn.setVisible(false);
+        laporanpembelianbtn.setVisible(false);
+        voucherbtn.setVisible(false);
+    }else if(hakAkses == 1) {
+        transaksipenjualanbtnkasir.setVisible(false);
+    }
+}
 private void styleSidebarButton(final javax.swing.JButton btn) {
     btn.setFocusPainted(false);
     btn.setBorderPainted(false);
@@ -214,7 +261,10 @@ private void setActiveButton(javax.swing.JButton btn) {
 private void setButtonIcon(javax.swing.JButton btn, String fileName) {
     btn.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Icon/" + fileName)));
 }
-
+/**
+ * [BARU] Method ini mengecek hak akses user dan menyembunyikan tombol
+ * yang tidak perlu.
+ */
 private String getButtonName(javax.swing.JButton btn) {
     if (btn == dashboardbtn) return "dashboard";
     if (btn == databarangbtn) return "databarang";
@@ -224,6 +274,7 @@ private String getButtonName(javax.swing.JButton btn) {
     if (btn == datapenggunabtn) return "datapengguna";
     if (btn == datahutangbtn) return "datahutang";
     if (btn == transaksipenjualanbtn) return "transaksipenjualan";
+    if (btn == transaksipenjualanbtnkasir) return "transaksipenjualan";
     if (btn == transaksipembelianbtn) return "transaksipembelian";
     if (btn == laporanpenjualanbtn) return "laporanpenjualan";
     if (btn == laporanpembelianbtn) return "laporanpembelian";
@@ -367,7 +418,6 @@ public void showTambahDataVoucher() {
         MenuIcon = new javax.swing.JPanel();
         lineseting = new javax.swing.JPanel();
         setting = new javax.swing.JPanel();
-        Buttonsetting = new javax.swing.JLabel();
         hidemenu = new javax.swing.JPanel();
         buttonhidemenu = new javax.swing.JLabel();
         linehidemenu = new javax.swing.JPanel();
@@ -386,6 +436,7 @@ public void showTambahDataVoucher() {
         voucherbtn = new javax.swing.JButton();
         jLabel2 = new javax.swing.JLabel();
         datakategoribtn = new javax.swing.JButton();
+        transaksipenjualanbtnkasir = new javax.swing.JButton();
         page = new javax.swing.JPanel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -480,23 +531,6 @@ public void showTambahDataVoucher() {
             }
         });
         setting.setLayout(new java.awt.BorderLayout());
-
-        Buttonsetting.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        Buttonsetting.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Icon/setting.png"))); // NOI18N
-        Buttonsetting.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        Buttonsetting.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                ButtonsettingMouseClicked(evt);
-            }
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                ButtonsettingMouseEntered(evt);
-            }
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                ButtonsettingMouseExited(evt);
-            }
-        });
-        setting.add(Buttonsetting, java.awt.BorderLayout.CENTER);
-
         MenuIcon.add(setting, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 55, 50, 50));
 
         hidemenu.setBackground(new java.awt.Color(250, 250, 250));
@@ -654,6 +688,14 @@ public void showTambahDataVoucher() {
         });
         menuhide.add(datakategoribtn, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 180, 220, 40));
 
+        transaksipenjualanbtnkasir.setText("Transaksi Penjualan");
+        transaksipenjualanbtnkasir.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                transaksipenjualanbtnkasirActionPerformed(evt);
+            }
+        });
+        menuhide.add(transaksipenjualanbtnkasir, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 140, 220, 40));
+
         menu.add(menuhide, java.awt.BorderLayout.CENTER);
 
         getContentPane().add(menu, java.awt.BorderLayout.LINE_START);
@@ -757,24 +799,13 @@ public void showTambahDataVoucher() {
         
     }//GEN-LAST:event_buttonhidemenuMouseClicked
 
-    private void ButtonsettingMouseEntered(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_ButtonsettingMouseEntered
-        changecolor(setting, new Color(245, 245, 245));
-    }//GEN-LAST:event_ButtonsettingMouseEntered
-
-    private void ButtonsettingMouseExited(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_ButtonsettingMouseExited
-        changecolor(setting, new Color(250, 250, 250));
-    }//GEN-LAST:event_ButtonsettingMouseExited
-
-    private void ButtonsettingMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_ButtonsettingMouseClicked
-        clickmenu(setting, hidemenu, 1);
-    }//GEN-LAST:event_ButtonsettingMouseClicked
-
     private void dashboardbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_dashboardbtnActionPerformed
     setActiveButton(dashboardbtn);
     page.removeAll();
     page.add(dashboardPanel);
     page.revalidate();
     page.repaint();
+    dashboardPanel.loadDashboardData();
     }//GEN-LAST:event_dashboardbtnActionPerformed
 
     private void databarangbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_databarangbtnActionPerformed
@@ -852,6 +883,14 @@ public void showTambahDataVoucher() {
         showdatakategori();  // TODO add your handling code here:
     }//GEN-LAST:event_datakategoribtnActionPerformed
 
+    private void transaksipenjualanbtnkasirActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_transaksipenjualanbtnkasirActionPerformed
+    setActiveButton(transaksipenjualanbtnkasir);
+        page.removeAll();
+    page.add(transaksipenjualanpanel);
+    page.revalidate();
+    page.repaint(); 
+    }//GEN-LAST:event_transaksipenjualanbtnkasirActionPerformed
+
 
     /**
      * @param args the command line arguments
@@ -873,7 +912,11 @@ UIManager.setLookAndFeel(new com.formdev.flatlaf.FlatDarkLaf());
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                new Mainmenu().setVisible(true);
+                try {
+                    new Mainmenu().setVisible(true);
+                } catch (SQLException ex) {
+                    Logger.getLogger(Mainmenu.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         });
     }
@@ -881,7 +924,6 @@ UIManager.setLookAndFeel(new com.formdev.flatlaf.FlatDarkLaf());
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel Buttonclose;
     private javax.swing.JPanel Buttonmax;
-    private javax.swing.JLabel Buttonsetting;
     private javax.swing.JPanel Header;
     private javax.swing.JPanel MenuIcon;
     private javax.swing.JLabel buttonhidemenu;
@@ -909,6 +951,7 @@ UIManager.setLookAndFeel(new com.formdev.flatlaf.FlatDarkLaf());
     private javax.swing.JPanel setting;
     private javax.swing.JButton transaksipembelianbtn;
     private javax.swing.JButton transaksipenjualanbtn;
+    private javax.swing.JButton transaksipenjualanbtnkasir;
     private javax.swing.JButton voucherbtn;
     // End of variables declaration//GEN-END:variables
 

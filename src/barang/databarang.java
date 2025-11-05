@@ -173,12 +173,14 @@ public class databarang extends JPanel {
         buttonPanel.setOpaque(false);
 
         JButton btnTambahDetail = createButton("Tambah Detail", new Color(53, 104, 89));
-        JButton btnTambah = createButton("Tambah Barang", new Color(30, 58, 138));
-        JButton btnEdit = createButton("Edit", new Color(217, 119, 6));
-        JButton btnHapus = createButton("Hapus", new Color(236, 28, 44));
-        JButton btnRefresh = createButton("Refresh", new Color(194, 65, 12));
+        JButton btnTambah = createButton("Tambah Barang", new Color(46, 204, 113));
+        JButton btnEdit = createButton("Edit", new Color(52, 152, 219));
+        JButton btnHapus = createButton("Hapus", new Color(231, 76, 60));
+        JButton btnRefresh = createButton("Refresh", new Color(155, 89, 182));
+        
+        
 
-        buttonPanel.add(btnTambahDetail);
+//        buttonPanel.add(btnTambahDetail);
         buttonPanel.add(btnTambah);
         buttonPanel.add(btnEdit);
         buttonPanel.add(btnHapus);
@@ -198,10 +200,10 @@ public class databarang extends JPanel {
         table.setRowHeight(30);
         table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         table.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
-        table.getTableHeader().setBackground(new Color(236, 28, 44));
+        table.getTableHeader().setBackground(new Color(60, 80, 120));
         table.getTableHeader().setForeground(Color.WHITE);
         table.setGridColor(new Color(230, 230, 230));
-        table.setSelectionBackground(new Color(30, 58, 138));
+        table.setSelectionBackground(new Color(93, 173, 226));
         table.setSelectionForeground(Color.WHITE);
 
         JScrollPane scrollPane = new JScrollPane(table);

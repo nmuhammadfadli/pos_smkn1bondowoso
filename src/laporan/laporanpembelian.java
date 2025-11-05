@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
 import Helper.DatabaseHelper;
+import java.time.ZoneId;
 import transaksi_pembelian.PembelianDAO;
 import transaksi_pembelian.Pembelian;
 import transaksi_pembelian.DetailPembelian;
@@ -57,15 +58,35 @@ public class laporanpembelian extends JPanel {
         filterPanel.setOpaque(false);
         JLabel lblDari = new JLabel("Dari:");
         JLabel lblSampai = new JLabel("Sampai:");
-        JTextField txtDari = createDateField();
-        JTextField txtSampai = createDateField();
-        JButton btnFilter = createModernButton("Filter", new Color(33, 150, 243), 120, 40);
+        
+        // === FILTER PANEL ===
+        com.toedter.calendar.JDateChooser txtDari = new com.toedter.calendar.JDateChooser();
+        txtDari.setDateFormatString("yyyy-MM-dd");
+        txtDari.setPreferredSize(new Dimension(120, 28));
+
+        com.toedter.calendar.JDateChooser txtSampai = new com.toedter.calendar.JDateChooser();
+        txtSampai.setDateFormatString("yyyy-MM-dd");
+        txtSampai.setPreferredSize(new Dimension(120, 28));
+
+        // set default tanggal ke hari ini
+        java.util.Date today = new java.util.Date();
+        txtDari.setDate(today);
+        txtSampai.setDate(today);
+
+
+
+
+        JButton btnFilter = createModernButton("Filter", new Color(33,150,243), 100, 36);
+        JButton btnRefresh = createModernButton("Refresh", new Color(76,175,80), 100, 36);
+
 
         filterPanel.add(lblDari);
         filterPanel.add(txtDari);
         filterPanel.add(lblSampai);
         filterPanel.add(txtSampai);
         filterPanel.add(btnFilter);
+        filterPanel.add(btnRefresh);
+
 
         // ===== TABEL PEMBELIAN =====
         String[] kolom = {"Tanggal", "Kode Pembelian", "Nama Barang", "Supplier", "Jumlah", "Harga", "Total"};
@@ -75,7 +96,12 @@ public class laporanpembelian extends JPanel {
         JTable tabel = new JTable(model);
         tabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         tabel.setRowHeight(28);
-        tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
+        tabel.getTableHeader().setBackground(new Color(60, 80, 120));
+        tabel.getTableHeader().setForeground(Color.WHITE);
+        tabel.setGridColor(new Color(230, 230, 230));
+        tabel.setSelectionBackground(new Color(93, 173, 226));
+        tabel.setSelectionForeground(Color.WHITE);
 
         JScrollPane scroll = new JScrollPane(tabel);
         scroll.getViewport().setBackground(Color.WHITE);
@@ -121,121 +147,146 @@ public class laporanpembelian extends JPanel {
         mainPanel.add(leftPanel, BorderLayout.CENTER);
         mainPanel.add(rightPanel, BorderLayout.EAST);
         add(mainPanel, BorderLayout.CENTER);
+        
+btnRefresh.addActionListener(e -> {
+    txtDari.setDate(today);
+    txtSampai.setDate(today);
+    LocalDate now = LocalDate.now();
+    loadAndPopulate(model, now, now);
+});
+    LocalDate now = LocalDate.now();
+    loadAndPopulate(model, now, now);
+    
+btnFilter.addActionListener(e -> {
+    LocalDate dari = null, sampai = null;
+    if (txtDari.getDate() != null)
+        dari = txtDari.getDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    if (txtSampai.getDate() != null)
+        sampai = txtSampai.getDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
-        // initial load - tanpa filter (semua)
-        loadAndPopulate(model, "", "");
-
-        // tombol filter action
-        btnFilter.addActionListener(e -> {
-            String dari = txtDari.getText().trim();
-            String sampai = txtSampai.getText().trim();
-            // validate dates if not empty
-            try {
-                if (!dari.isEmpty()) LocalDate.parse(dari, DATE_FMT);
-                if (!sampai.isEmpty()) LocalDate.parse(sampai, DATE_FMT);
-            } catch (DateTimeParseException ex) {
-                JOptionPane.showMessageDialog(this, "Format tanggal harus yyyy-MM-dd (contoh: 2025-10-01)", "Format tanggal salah", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            loadAndPopulate(model, dari, sampai);
-        });
+    if (dari != null && sampai != null && sampai.isBefore(dari)) {
+        JOptionPane.showMessageDialog(this, "'Sampai' tidak boleh sebelum 'Dari'.",
+                "Rentang tanggal", JOptionPane.ERROR_MESSAGE);
+        return;
     }
+
+    loadAndPopulate(model, dari, sampai);
+});
+
+
+    }
+    
+    
 
     /**
      * Muat data pembelian & detail dari DB, isi tabel model dan update ringkasan.
      * Jika dari/sampai kosong -> ambil semua.
      */
-    private void loadAndPopulate(DefaultTableModel model, String dari, String sampai) {
-        model.setRowCount(0);
+private void loadAndPopulate(DefaultTableModel model, LocalDate dari, LocalDate sampai) {
+    model.setRowCount(0);
 
-        long totalPengeluaran = 0L;
-        int jumlahPembelian = 0;
-        long jumlahBarangDibeli = 0L;
+    long totalPengeluaran = 0L;
+    int jumlahPembelian = 0;
+    long jumlahBarangDibeli = 0L;
 
-        NumberFormat nf = NumberFormat.getInstance(new Locale("in","ID"));
-        DecimalFormat df = new DecimalFormat("#,###");
+    NumberFormat nf = NumberFormat.getInstance(new Locale("in", "ID"));
+    DecimalFormat df = new DecimalFormat("#,###");
 
-        try {
-            PembelianDAO pdao = new PembelianDAO();
-            List<Pembelian> purchases = pdao.findAllPembelian();
+    try {
+        PembelianDAO pdao = new PembelianDAO();
+        List<Pembelian> purchases = pdao.findAllPembelian();
 
-            // if date filter provided, filter by tanggal
-            List<Pembelian> filtered = new ArrayList<>();
-            for (Pembelian p : purchases) {
-                if (p == null || p.getTglPembelian() == null) continue;
-                if (!dari.isEmpty()) {
-                    LocalDate dFrom = LocalDate.parse(dari, DATE_FMT);
-                    LocalDate tgl = LocalDate.parse(p.getTglPembelian(), DATE_FMT);
-                    if (tgl.isBefore(dFrom)) continue;
-                }
-                if (!sampai.isEmpty()) {
-                    LocalDate dTo = LocalDate.parse(sampai, DATE_FMT);
-                    LocalDate tgl = LocalDate.parse(p.getTglPembelian(), DATE_FMT);
-                    if (tgl.isAfter(dTo)) continue;
-                }
-                filtered.add(p);
-            }
+        List<Pembelian> filtered = new ArrayList<>();
+        for (Pembelian p : purchases) {
+            if (p == null || p.getTglPembelian() == null) continue;
 
-            // iterate filtered purchases and expand details into table rows
-            for (Pembelian p : filtered) {
-                List<DetailPembelian> dets = pdao.findDetailsByPembelian(p.getIdPembelian());
-                if (dets == null || dets.isEmpty()) {
-                    // tampilkan satu baris kosong detail (jika tidak ada detail) agar header terlihat
-                    model.addRow(new Object[]{
-                            p.getTglPembelian(),
-                            p.getIdPembelian(),
-                            "-", // nama barang
-                            "-", // supplier
-                            0,
-                            0,
-                            p.getTotalHarga() == null ? 0 : p.getTotalHarga()
-                    });
-                    totalPengeluaran += p.getTotalHarga() == null ? 0 : p.getTotalHarga();
-                    jumlahPembelian++;
-                    continue;
-                }
+            LocalDate tgl = parseDateSafe(p.getTglPembelian());
+            if (tgl == null) continue;
 
-                // jika ada detail, tampilkan masing-masing detail per baris
-                for (DetailPembelian d : dets) {
-                    String namaBarang = resolveNamaBarang(d.getIdBarang());
-                    String namaSupplier = resolveNamaSupplier(d.getIdSupplier());
+            if (dari != null && tgl.isBefore(dari)) continue;
+            if (sampai != null && tgl.isAfter(sampai)) continue;
 
-                    int qty = d.getStok() == null ? 0 : d.getStok();
-                    int harga = d.getHargaBeli() == null ? 0 : d.getHargaBeli();
-                    int subtotal = d.getSubtotal() == null ? (int)Math.min((long)qty * (long)harga, Integer.MAX_VALUE) : d.getSubtotal();
-
-                    model.addRow(new Object[]{
-                            p.getTglPembelian(),
-                            p.getIdPembelian(),
-                            namaBarang,
-                            namaSupplier,
-                            qty,
-                            harga,
-                            subtotal
-                    });
-
-                    totalPengeluaran += subtotal;
-                    jumlahBarangDibeli += qty;
-                }
-                // satu transaksi (header) dihitung sekali
-                jumlahPembelian++;
-            }
-
-            // update summary labels
-            lblTotalPengeluaranValue.setText("Rp " + df.format(totalPengeluaran));
-            lblJumlahPembelianValue.setText(String.valueOf(jumlahPembelian));
-            lblBarangDibeliValue.setText(String.valueOf(jumlahBarangDibeli));
-            String rata = jumlahPembelian > 0 ? String.valueOf(df.format((long)(totalPengeluaran / jumlahPembelian))) : "Rp " + df.format(0);
-            // rata currently number only; add Rp prefix
-            if (jumlahPembelian > 0) lblRataRataValue.setText("Rp " + df.format(totalPengeluaran / jumlahPembelian));
-            else lblRataRataValue.setText("Rp " + df.format(0));
-
-        } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Gagal memuat data pembelian:\n" + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Error:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            filtered.add(p);
         }
+
+        // iterate filtered purchases and expand details into table rows
+        for (Pembelian p : filtered) {
+            List<DetailPembelian> dets = pdao.findDetailsByPembelian(p.getIdPembelian());
+            if (dets == null || dets.isEmpty()) {
+                // tampilkan satu baris kosong detail (jika tidak ada detail)
+                model.addRow(new Object[]{
+                        p.getTglPembelian(),
+                        p.getIdPembelian(),
+                        "-", // nama barang
+                        "-", // supplier
+                        0,
+                        0,
+                        p.getTotalHarga() == null ? 0 : p.getTotalHarga()
+                });
+                totalPengeluaran += p.getTotalHarga() == null ? 0 : p.getTotalHarga();
+                jumlahPembelian++;
+                continue;
+            }
+
+            // jika ada detail, tampilkan masing-masing detail per baris
+            for (DetailPembelian d : dets) {
+                String namaBarang = resolveNamaBarang(d.getIdBarang());
+                String namaSupplier = resolveNamaSupplier(d.getIdSupplier());
+
+                int qty = d.getStok() == null ? 0 : d.getStok();
+                int harga = d.getHargaBeli() == null ? 0 : d.getHargaBeli();
+                int subtotal = d.getSubtotal() == null
+                        ? (int) Math.min((long) qty * (long) harga, Integer.MAX_VALUE)
+                        : d.getSubtotal();
+
+                model.addRow(new Object[]{
+                        p.getTglPembelian(),
+                        p.getIdPembelian(),
+                        namaBarang,
+                        namaSupplier,
+                        qty,
+                        harga,
+                        subtotal
+                });
+
+                totalPengeluaran += subtotal;
+                jumlahBarangDibeli += qty;
+            }
+
+            jumlahPembelian++;
+        }
+
+        // update summary labels
+        lblTotalPengeluaranValue.setText("Rp " + df.format(totalPengeluaran));
+        lblJumlahPembelianValue.setText(String.valueOf(jumlahPembelian));
+        lblBarangDibeliValue.setText(String.valueOf(jumlahBarangDibeli));
+
+        if (jumlahPembelian > 0)
+            lblRataRataValue.setText("Rp " + df.format(totalPengeluaran / jumlahPembelian));
+        else
+            lblRataRataValue.setText("Rp " + df.format(0));
+
+    } catch (SQLException ex) {
+        JOptionPane.showMessageDialog(this,
+                "Gagal memuat data pembelian:\n" + ex.getMessage(),
+                "DB Error", JOptionPane.ERROR_MESSAGE);
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this,
+                "Error:\n" + ex.getMessage(),
+                "Error", JOptionPane.ERROR_MESSAGE);
     }
+}
+private final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
+
+private LocalDate parseDateSafe(String s) {
+    try {
+        if (s == null || s.isEmpty()) return null;
+        if (s.length() >= 10) s = s.substring(0, 10);
+        return LocalDate.parse(s, ISO);
+    } catch (Exception ex) {
+        return null;
+    }
+}
 
     /**
      * Resolve nama barang dari id (fallback ke "-" jika tidak ada).
@@ -422,4 +473,5 @@ public class laporanpembelian extends JPanel {
         frame.setContentPane(new laporanpembelian());
         frame.setVisible(true);
     }
+    
 }

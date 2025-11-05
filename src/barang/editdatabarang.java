@@ -12,11 +12,17 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 
+// [FIX] Impor yang diperlukan untuk JDateChooser dan format tanggal
+import com.toedter.calendar.JDateChooser;
+import java.util.Date;
+import java.text.SimpleDateFormat;
+import java.text.ParseException;
+
 import Helper.DatabaseHelper;
 
 /**
  * editdatabarang - versi yang mengisi field otomatis dan menyimpan perubahan ke DB
- * Fokus perbaikan: PilihKategoriFrame membaca kategori dari DB dan selectedKategoriId di-set.
+ * Fokus perbaikan: Menggunakan JDateChooser untuk input tanggal expired.
  */
 public class editdatabarang extends JPanel {
     // input fields (digunakan ulang di seluruh class)
@@ -26,7 +32,7 @@ public class editdatabarang extends JPanel {
     private RoundedTextField txtBarcode;
     private RoundedTextField txtStok;
     private RoundedTextField txtHarga;
-    private RoundedTextField txtExpired;
+    private JDateChooser dateExpired; // [FIX] Diganti dari RoundedTextField
 
     // menyimpan id kategori yang dipilih (penting untuk update)
     private String selectedKategoriId = null;
@@ -81,7 +87,29 @@ public class editdatabarang extends JPanel {
         txtBarcode = addField(formPanel, gbc, 3, "Barcode:");
         txtStok = addField(formPanel, gbc, 4, "Stok:");
         txtHarga = addField(formPanel, gbc, 5, "Harga Jual:");
-        txtExpired = addField(formPanel, gbc, 6, "Expired:");
+        
+        // [FIX] Hapus baris ini:
+        // txtExpired = addField(formPanel, gbc, 6, "Expired:");
+
+        // [FIX] Tambahkan JDateChooser secara manual
+        gbc.gridx = 6 % 3; // Kolom 0
+        gbc.gridy = 6 / 3; // Baris 2
+
+        JPanel expiredPanel = new JPanel(new BorderLayout(5, 5));
+        expiredPanel.setOpaque(false);
+        JLabel lblExpired = new JLabel("Expired:");
+        lblExpired.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        dateExpired = new JDateChooser();
+        dateExpired.setDateFormatString("yyyy-MM-dd"); // Format tanggal SQL
+        dateExpired.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        // Atur tinggi agar konsisten dengan field lain (tinggi RoundedTextField sekitar 38px)
+        dateExpired.setPreferredSize(new Dimension(0, 38)); 
+
+        expiredPanel.add(lblExpired, BorderLayout.NORTH);
+        expiredPanel.add(dateExpired, BorderLayout.CENTER);
+        formPanel.add(expiredPanel, gbc);
+
 
         // Kategori clickable: panggil PilihKategoriFrame yang juga set selectedKategoriId
         txtKategori.setEditable(false);
@@ -160,8 +188,17 @@ public class editdatabarang extends JPanel {
                             // jika parsing gagal, jangan override
                         }
                     }
+                    
+                    // [FIX] Ambil tanggal dari JDateChooser
+                    Date expDate = dateExpired.getDate();
+                    if (expDate != null) {
+                        // Format tanggalnya ke String standar SQL "yyyy-MM-dd"
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                        d.setTanggalExp(sdf.format(expDate));
+                    } else {
+                        d.setTanggalExp(null); // Kosongkan jika tidak diisi
+                    }
 
-                    d.setTanggalExp(txtExpired.getText().trim());
                     // lakukan update
                     detailDao.update(d);
                 }
@@ -266,7 +303,22 @@ public class editdatabarang extends JPanel {
                     } else {
                         txtHarga.setText("");
                     }
-                    txtExpired.setText(d.getTanggalExp() == null ? "" : d.getTanggalExp());
+                    
+                    // [FIX] Load tanggal ke JDateChooser
+                    String expDateStr = d.getTanggalExp();
+                    if (expDateStr != null && !expDateStr.trim().isEmpty()) {
+                        try {
+                            // Ubah String dari DB ("yyyy-MM-dd") kembali ke objek Date
+                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                            Date parsedDate = sdf.parse(expDateStr);
+                            dateExpired.setDate(parsedDate);
+                        } catch (ParseException ex) {
+                            // Jika format di DB salah, biarkan kosong
+                            dateExpired.setDate(null);
+                        }
+                    } else {
+                        dateExpired.setDate(null);
+                    }
                 }
             }
 
@@ -282,7 +334,7 @@ public class editdatabarang extends JPanel {
         txtBarcode.setText("");
         txtStok.setText("");
         txtHarga.setText("");
-        txtExpired.setText("");
+        dateExpired.setDate(null); // [FIX] Ganti ini
     }
 
     // === Helper: membuat field (mengembalikan referensi field) ===
@@ -512,5 +564,5 @@ public class editdatabarang extends JPanel {
         return id;
     }
 
-   
+    
 }

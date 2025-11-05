@@ -51,7 +51,7 @@ public class datasupplier extends JPanel {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonPanel.setOpaque(false);
 
-        JButton btnTambah = createButton("Tambah Supplier", new Color(30, 58, 128));
+        JButton btnTambah = createButton("Tambah Supplier", new Color(46, 204, 113));
         btnTambah.addActionListener(e -> {
             // ambil frame induk (Mainmenu)
             JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
@@ -60,7 +60,7 @@ public class datasupplier extends JPanel {
             }
         });
 
-        JButton btnEdit = createButton("Edit", new Color(217, 119, 6));
+        JButton btnEdit = createButton("Edit", new Color(52, 152, 219));
         btnEdit.addActionListener(e -> {
             int sel = table.getSelectedRow();
             if (sel < 0) {
@@ -85,8 +85,8 @@ public class datasupplier extends JPanel {
             }
         });
 
-        JButton btnHapus = createButton("Hapus", new Color(236, 28, 44));
-        JButton btnRefresh = createButton("Refresh", new Color(194, 65, 12));
+        JButton btnHapus = createButton("Hapus", new Color(231, 76, 60));
+        JButton btnRefresh = createButton("Refresh", new Color(155, 89, 182));
 
         buttonPanel.add(btnTambah);
         buttonPanel.add(btnEdit);
@@ -107,10 +107,10 @@ public class datasupplier extends JPanel {
         table.setRowHeight(30);
         table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         table.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
-        table.getTableHeader().setBackground(new Color(236, 28, 44));
+        table.getTableHeader().setBackground(new Color(60, 80, 120));
         table.getTableHeader().setForeground(Color.WHITE);
         table.setGridColor(new Color(230, 230, 230));
-        table.setSelectionBackground(new Color(30, 58, 138));
+        table.setSelectionBackground(new Color(93, 173, 226));
         table.setSelectionForeground(Color.WHITE);
 
         JScrollPane scrollPane = new JScrollPane(table);
