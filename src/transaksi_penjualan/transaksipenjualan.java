@@ -136,7 +136,7 @@ private void initHeader() {
         y += gapY;
         JLabel lblNama = makeLabel("Nama Barang:", x, y);
         txtNama = makeField(x, y + 22, fieldW - 90, fieldH);
-        btnPilihBarang = createButton("Pilih", new Color(255, 140, 0), 90, 46);
+        btnPilihBarang = createButton("Pilih", new Color(26, 97, 145), 90, 46);
         btnPilihBarang.setBounds(x + fieldW - 80, y + 22, 90, 46);
         leftPanel.add(lblNama);
         leftPanel.add(txtNama);
@@ -162,7 +162,7 @@ private void initHeader() {
         leftPanel.add(txtSubtotal);
 
         // Tombol Masukkan Keranjang
-        btnKeranjang = createButton("Masukkan Keranjang", new Color(0,180,0), fieldW + 10, 55);
+        btnKeranjang = createButton("Masukkan Keranjang", new Color(26, 97, 145), fieldW + 10, 55);
         btnKeranjang.setBounds(x, y + gapY + 15, fieldW + 10, 55);
         leftPanel.add(btnKeranjang);
 
@@ -196,7 +196,7 @@ private void initHeader() {
         // Buttons Cancel & Reset
         JPanel tombolPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 10));
         tombolPanel.setOpaque(false);
-        btnCancel = createButton("Cancel", new Color(218,165,32), 120, 45);
+        btnCancel = createButton("Cancel", new Color(155, 89, 182), 120, 45);
         btnReset = createButton("Reset", new Color(255,0,0), 120, 45);
         tombolPanel.add(btnCancel);
         tombolPanel.add(btnReset);
@@ -281,7 +281,7 @@ private void initHeader() {
         // Wrapper card
         JPanel bayarWrapper = new JPanel();
         bayarWrapper.setLayout(new BoxLayout(bayarWrapper, BoxLayout.Y_AXIS));
-        bayarWrapper.setBackground(new Color(255, 140, 0));
+        bayarWrapper.setBackground(new Color(53, 67, 77));
         bayarWrapper.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createEmptyBorder(6, 6, 6, 6),
                 BorderFactory.createCompoundBorder(
@@ -303,7 +303,7 @@ int jarak = 10; // Jarak antar tombol
 int tinggiTombol = 55; // Tinggi tombol
 
 // Tombol selesai
-btnSelesai = createButton("Selesaikan Transaksi", new Color(0, 200, 0), lebarSelesai, tinggiTombol);
+btnSelesai = createButton("Selesaikan Transaksi", new Color(26, 97, 145), lebarSelesai, tinggiTombol);
 
 // Tombol cetak
 btnCetak = createButton("Cetak", new Color(0, 123, 255), lebarCetak, tinggiTombol);
