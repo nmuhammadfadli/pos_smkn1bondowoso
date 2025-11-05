@@ -63,8 +63,14 @@ public class transaksipenjualan extends JPanel {
     private JButton btnBayar; // optional (alias)
 
     // ==== internal state ====
-    private DetailBarang selectedDetail = null; // diisi saat picker memilih
+    private DetailBarang selectedDetail = null;
     private Voucher[] vouchers = new Voucher[0];
+
+    // cache sederhana untuk mencegah duplicate lookup yang persis sama
+    private String lastBarcodeLookup = "";
+
+    // flag untuk mencegah document listener bereaksi saat kita setText programmatically
+    private volatile boolean suppressBarcodeLookup = false;
 
     public transaksipenjualan() {
         setLayout(new BorderLayout());
@@ -105,24 +111,33 @@ public class transaksipenjualan extends JPanel {
         leftPanel.add(lblKode);
         leftPanel.add(txtKode);
 
+        // ----------------------------
+        // BARCODE above Nama (user requested)
+        // ----------------------------
         y += gapY;
+        JLabel lblBarcode = makeLabel("Barcode:", x, y);
+        txtBarcode = makeField(x, y + 22, 200, fieldH);
+        txtBarcode.setVisible(true);
+        leftPanel.add(lblBarcode);
+        leftPanel.add(txtBarcode);
+
+        // Nama Barang berada tepat di bawah barcode
+        y += gapY; // shift down for nama
         JLabel lblNama = makeLabel("Nama Barang:", x, y);
         txtNama = makeField(x, y + 22, fieldW - 90, fieldH);
+        txtNama.setEditable(false);
+        txtNama.setFocusable(false);
         btnPilihBarang = createButton("Pilih", new Color(255, 140, 0), 90, 46);
         btnPilihBarang.setBounds(x + fieldW - 80, y + 22, 90, 46);
         leftPanel.add(lblNama);
         leftPanel.add(txtNama);
         leftPanel.add(btnPilihBarang);
 
-        // barcode (hidden field visually optional)
-        txtBarcode = createRoundedField();
-        txtBarcode.setBounds(x, y + 22 + 48, 200, 28); // not shown in design but kept
-        txtBarcode.setVisible(false);
-        leftPanel.add(txtBarcode);
-
         y += gapY;
         JLabel lblHarga = makeLabel("Harga:", x, y);
         txtHarga = makeField(x, y + 22, fieldW, fieldH);
+        txtHarga.setEditable(false);
+        txtHarga.setFocusable(false);
         leftPanel.add(lblHarga);
         leftPanel.add(txtHarga);
 
@@ -290,11 +305,52 @@ public class transaksipenjualan extends JPanel {
         btnPilihBarang.addActionListener(e -> openPilihBarangFrame(txtNama));
         btnPilihVoucher.addActionListener(e -> openPilihVoucherFrame(txtVoucher));
 
+        // --------- BARCODE: no debounce ----------
+        txtBarcode.addActionListener(evt -> {
+            String raw = txtBarcode.getText();
+            String code = raw == null ? "" : raw.replaceAll("\\p{C}", "").trim(); // remove control chars
+            if (!code.isEmpty()) {
+                performLookupBarcode(code);
+            }
+        });
+
+        // langsung lookup on every change (no debounce)
+        txtBarcode.getDocument().addDocumentListener(new DocumentListener() {
+            private void doLookup() {
+                if (suppressBarcodeLookup) return; // skip if we're programmatically setting text
+
+                String raw = txtBarcode.getText();
+                // hapus karakter kontrol / newline yang kadang dikirim scanner
+                String code = raw == null ? "" : raw.replaceAll("\\p{C}", "").trim();
+
+
+                // jika kosong -> clear selection & jangan panggil DB
+                if (code.isEmpty()) {
+                    lastBarcodeLookup = "";
+                    selectedDetail = null;
+                    txtNama.setText("");
+                    txtHarga.setText("");
+                    if (!txtJumlah.isFocusOwner()) txtJumlah.setText("");
+                    txtSubtotal.setText("");
+                    return;
+                }
+                // hindari lookup ulang kalau kode persis sama dengan terakhir dicari
+                if (code.equals(lastBarcodeLookup)) return;
+                lastBarcodeLookup = code;
+                performLookupBarcode(code);
+            }
+            @Override public void insertUpdate(DocumentEvent e) { doLookup(); }
+            @Override public void removeUpdate(DocumentEvent e) { doLookup(); }
+            @Override public void changedUpdate(DocumentEvent e) { doLookup(); }
+        });
+
+        // ----------------------------------------
+
         content.add(leftPanel);
         content.add(rightPanel);
         add(content, BorderLayout.CENTER);
 
-        // hide ID column visually
+        // hide ID column visually and set initial focus to barcode
         SwingUtilities.invokeLater(() -> {
             TableColumnModel cm = tabel.getColumnModel();
             if (cm.getColumnCount() > 0) {
@@ -302,10 +358,12 @@ public class transaksipenjualan extends JPanel {
                 cm.getColumn(0).setMaxWidth(0);
                 cm.getColumn(0).setPreferredWidth(0);
             }
+            // minta fokus ke barcode saat UI sudah siap
+            if (txtBarcode != null) txtBarcode.requestFocusInWindow();
         });
     }
 
-    // ========== Core behavior (sama dengan TransactionDialog) ==========
+    // ========== Core behavior ==========
 
     private void onTambah() {
         try {
@@ -365,13 +423,28 @@ public class transaksipenjualan extends JPanel {
 
             updateTotal();
 
-            // clear selection & inputs after adding
+            // clear selection & inputs after adding — kosongkan barcode juga supaya operator bisa scan berikutnya
             selectedDetail = null;
             txtNama.setText("");
             txtHarga.setText("");
             txtJumlah.setText("");
             txtSubtotal.setText("");
-            txtBarcode.requestFocusInWindow();
+            // kosongkan barcode agar siap untuk scan berikutnya (suppress listener sementara)
+            suppressBarcodeLookup = true;
+            try {
+                txtBarcode.setText("");
+                lastBarcodeLookup = "";
+            } finally {
+                suppressBarcodeLookup = false;
+            }
+
+            // kembali fokus ke barcode (pakai invokeLater supaya safe)
+            SwingUtilities.invokeLater(() -> {
+                if (txtBarcode != null) {
+                    txtBarcode.requestFocusInWindow();
+                    txtBarcode.selectAll();
+                }
+            });
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Gagal tambah item: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -438,56 +511,113 @@ public class transaksipenjualan extends JPanel {
         }
     }
 
-    private void onBayar() {
-        if (model.getRowCount() == 0) { JOptionPane.showMessageDialog(this, "Keranjang kosong."); return; }
+ private void onBayar() {
+    if (model.getRowCount() == 0) {
+        JOptionPane.showMessageDialog(this, "Keranjang kosong.");
+        return;
+    }
 
-        List<SaleItem> items = new ArrayList<>();
-        try {
-            for (int i = 0; i < model.getRowCount(); i++) {
-                int idDetail = Integer.parseInt(model.getValueAt(i, 0).toString());
-                int qty = Integer.parseInt(model.getValueAt(i, 4).toString());
-                BigDecimal price = new BigDecimal(model.getValueAt(i, 3).toString());
-                items.add(new SaleItem(idDetail, qty, price));
+    // kumpulkan items
+    List<SaleItem> items = new ArrayList<>();
+    try {
+        for (int i = 0; i < model.getRowCount(); i++) {
+            int idDetail = Integer.parseInt(model.getValueAt(i, 0).toString());
+            int qty = Integer.parseInt(model.getValueAt(i, 4).toString());
+            BigDecimal price = new BigDecimal(model.getValueAt(i, 3).toString());
+            items.add(new SaleItem(idDetail, qty, price));
+        }
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, "Data keranjang rusak: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+
+    // total transaksi
+    BigDecimal total;
+    try {
+        total = new BigDecimal(lblTotal.getText().trim().replace(",",""));
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, "Total transaksi tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+
+    // cari voucher (jika diisi)
+    Integer voucherId = null;
+    String kodeVoucher = txtVoucher.getText().trim();
+    if (!kodeVoucher.isEmpty()) {
+        for (Voucher v : vouchers) {
+            if (v != null && kodeVoucher.equals(v.getKode())) {
+                voucherId = v.getIdVoucher();
+                break;
             }
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Data keranjang rusak: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // parse jumlah bayar
+    BigDecimal cashPaid = BigDecimal.ZERO;
+    String bayarStr = txtJumlahBayar.getText().trim();
+    if (voucherId == null) {
+        // TANPA VOUCHER => harus bayar tunai dan tunai >= total
+        if (bayarStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Masukkan nominal pembayaran tunai. Jika ingin kredit, pilih voucher terlebih dahulu.", "Pembayaran", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        Integer voucherId = null;
-        String kodeVoucher = txtVoucher.getText().trim();
-        if (!kodeVoucher.isEmpty()) {
-            for (Voucher v : vouchers) {
-                if (v != null && kodeVoucher.equals(v.getKode())) { voucherId = v.getIdVoucher(); break; }
-            }
-        }
-
-        BigDecimal cashPaid;
         try {
-            cashPaid = new BigDecimal(txtJumlahBayar.getText().trim().replace(",",""));
+            cashPaid = new BigDecimal(bayarStr.replace(",",""));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Format uang bayar tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
-
-        String kodeTrans = txtKode.getText();
-
-        try {
-            txDao.processSale(items, voucherId, cashPaid, kodeTrans, null); // ubah null ke user id bila perlu
-            JOptionPane.showMessageDialog(this, "Transaksi berhasil. Kode: " + kodeTrans, "Sukses", JOptionPane.INFORMATION_MESSAGE);
-
-            model.setRowCount(0);
-            updateTotal();
-            txtJumlahBayar.setText("0");
-            lblKembali.setText("0");
-            txtKode.setText(generateTransactionCode());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Gagal memproses transaksi: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        if (cashPaid.compareTo(total) < 0) {
+            JOptionPane.showMessageDialog(this, "Pembayaran tunai kurang. Jika ingin menyisakan hutang, pilih voucher terlebih dahulu.", "Pembayaran", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+    } else {
+        // DENGAN VOUCHER => boleh hutang => terima kosong atau nominal <= total
+        if (!bayarStr.isEmpty()) {
+            try {
+                cashPaid = new BigDecimal(bayarStr.replace(",",""));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Format uang bayar tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (cashPaid.compareTo(BigDecimal.ZERO) < 0) {
+                JOptionPane.showMessageDialog(this, "Nominal bayar tidak boleh negatif.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        } else {
+            cashPaid = BigDecimal.ZERO; // kosong dianggap 0 saat voucher dipakai
         }
     }
 
-    // ========== Picker Frames ==========
+    String kodeTrans = txtKode.getText();
 
+    try {
+        txDao.processSale(items, voucherId, cashPaid, kodeTrans, null); // ubah null ke user id bila perlu
+        JOptionPane.showMessageDialog(this, "Transaksi berhasil. Kode: " + kodeTrans, "Sukses", JOptionPane.INFORMATION_MESSAGE);
+
+        model.setRowCount(0);
+        updateTotal();
+        txtJumlahBayar.setText("0");
+        lblKembali.setText("0");
+        txtKode.setText(generateTransactionCode());
+
+        // reset field input juga (menyamakan perilaku sebelumnya)
+        resetFields();
+
+        // fokus kembali ke barcode setelah transaksi sukses
+        SwingUtilities.invokeLater(() -> {
+            if (txtBarcode != null) {
+                txtBarcode.requestFocusInWindow();
+                txtBarcode.selectAll();
+            }
+        });
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, "Gagal memproses transaksi: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+
+    // ========== Picker Frames ==========
     private void openPilihBarangFrame(JTextField targetField) {
         try {
             List<DetailBarang> list = detailDao.findAll();
@@ -553,13 +683,26 @@ public class transaksipenjualan extends JPanel {
                 selectedDetail = null;
                 for (DetailBarang d : list) { if (d.getId() == idDetail) { selectedDetail = d; break; } }
                 if (selectedDetail != null) {
-                    txtBarcode.setText(selectedDetail.getBarcode()==null?"":selectedDetail.getBarcode());
-                    txtNama.setText(selectedDetail.getNamaBarang()==null?"":selectedDetail.getNamaBarang());
-                    txtHarga.setText(selectedDetail.getHargaJual()==null?"0":selectedDetail.getHargaJual().toPlainString());
-                    txtJumlah.setText("1");
-                    recalcSubtotal();
+                    // suppress listener saat kita setText programmatically
+                    String barcodeVal = selectedDetail.getBarcode()==null?"":selectedDetail.getBarcode().replaceAll("\\p{C}", "").trim();
+                    suppressBarcodeLookup = true;
+                    try {
+                        txtBarcode.setText(barcodeVal);
+                        txtNama.setText(selectedDetail.getNamaBarang()==null?"":selectedDetail.getNamaBarang());
+                        txtHarga.setText(selectedDetail.getHargaJual()==null?"0":selectedDetail.getHargaJual().toPlainString());
+                        lastBarcodeLookup = barcodeVal; // keep cache in sync
+                        recalcSubtotal();
+                        // set caret to end so operator can continue typing/scanning
+                        txtBarcode.setCaretPosition(txtBarcode.getText().length());
+                    } finally {
+                        suppressBarcodeLookup = false;
+                    }
                 }
                 dlg.dispose();
+                // fokus kembali ke barcode setelah dialog tertutup
+                SwingUtilities.invokeLater(() -> {
+                    if (txtBarcode != null) txtBarcode.requestFocusInWindow();
+                });
             });
 
             cancel.addActionListener(ae -> dlg.dispose());
@@ -753,6 +896,84 @@ public class transaksipenjualan extends JPanel {
         txtVoucher.setText("");
         txtJumlah.setText("");
         txtSubtotal.setText("");
+        // keep barcode cleared as well so operator can scan new item (suppress listener)
+        suppressBarcodeLookup = true;
+        try {
+            txtBarcode.setText("");
+            lastBarcodeLookup = "";
+        } finally {
+            suppressBarcodeLookup = false;
+        }
+    }
+
+    private void performLookupBarcode(String barcode) {
+       
+        new SwingWorker<DetailBarang, Void>() {
+            @Override
+            protected DetailBarang doInBackground() throws Exception {
+                if (barcode == null || barcode.trim().isEmpty()) return null;
+                try {
+                    return detailDao.findByBarcode(barcode.trim());
+                } catch (Exception ex) {
+                    throw ex;
+                }
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    DetailBarang d = get();
+                    if (d == null) {
+                        // barang tidak ditemukan: clear fields (jangan ganggu input barcode)
+                        selectedDetail = null;
+                        txtNama.setText("");
+                        txtHarga.setText("");
+                        // hanya kosongkan subtotal/jumlah bila user tidak sedang mengedit jumlah
+                        if (!txtJumlah.isFocusOwner()) txtJumlah.setText("");
+                        txtSubtotal.setText("");
+                        // keep focus on barcode and select all to allow quick re-scan
+                        lastBarcodeLookup = ""; // sinkronisasi cache
+                        SwingUtilities.invokeLater(() -> {
+                            if (txtBarcode != null) {
+                                txtBarcode.requestFocusInWindow();
+                                txtBarcode.selectAll();
+                            }
+                        });
+                    } else {
+                        selectedDetail = d;
+                        final String foundCode = d.getBarcode() == null ? "" : d.getBarcode().replaceAll("\\p{C}", "").trim();
+
+                        // update UI on EDT and suppress document listener while setting txtBarcode
+                        SwingUtilities.invokeLater(() -> {
+                            suppressBarcodeLookup = true;
+                            try {
+                                txtBarcode.setText(foundCode);
+                                txtNama.setText(d.getNamaBarang() == null ? "" : d.getNamaBarang());
+                                txtHarga.setText(d.getHargaJual() == null ? "0" : d.getHargaJual().toPlainString());
+                                lastBarcodeLookup = foundCode; // keep cache consistent
+                                // Hanya set default qty = 1 jika field qty KOSONG.
+                                // Jangan overwrite jika operator sedang mengetik jumlah (isFocusOwner).
+//                                if (txtJumlah.getText().trim().isEmpty()) {
+//                                    txtJumlah.setText("1");
+//                                }
+                                recalcSubtotal();
+                                if (!txtJumlah.isFocusOwner()) {
+                                    txtJumlah.requestFocusInWindow();
+                                    txtJumlah.selectAll();
+                                }
+                            } finally {
+                                suppressBarcodeLookup = false;
+                            }
+                        });
+                    }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(transaksipenjualan.this, "Gagal cari barcode: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    SwingUtilities.invokeLater(() -> {
+                        if (txtBarcode != null) { txtBarcode.requestFocusInWindow(); txtBarcode.selectAll(); }
+                    });
+                }
+            }
+        }.execute();
     }
 
     // ====== Main testing ======

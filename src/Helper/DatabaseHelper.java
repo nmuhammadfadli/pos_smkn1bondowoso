@@ -18,17 +18,34 @@ import java.util.List;
  * Java 8 compatible. Package: testsqlite
  */
 public class DatabaseHelper {
+    
     private static final String DB_PATH = "data/pos_app.db";
     private static final String URL = "jdbc:sqlite:" + DB_PATH;
+    //jdbc:sqlite:data/pos_app.db
 
     // ------------------ init & connection ------------------
+    private static String resolveDbPath() throws IOException {
+    File dbFile = new File(DB_PATH);
+    File parent = dbFile.getParentFile();
+    if (parent != null && !parent.exists()) {
+        if (!parent.mkdirs()) {
+            throw new IOException("Gagal membuat folder DB: " + parent.getAbsolutePath());
+        }
+    }
+    // return absolute path (so JDBC gets full path)
+    return dbFile.getAbsolutePath();
+}
+    
     public static void initDatabase() throws Exception {
         System.out.println("Working dir: " + System.getProperty("user.dir"));
-        File dbFile = new File(DB_PATH);
+       File dbFile = new File(resolveDbPath());
+       System.out.println("Using SQLite DB file: " + dbFile.getAbsolutePath());
+
         if (dbFile.getParentFile() != null && !dbFile.getParentFile().exists()) {
             dbFile.getParentFile().mkdirs();
         }
         boolean existed = dbFile.exists();
+        
 
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
@@ -316,14 +333,17 @@ public class DatabaseHelper {
         } catch (ClassNotFoundException e) {
             System.err.println("Driver SQLite tidak ditemukan. Pastikan sqlite-jdbc.jar ada di Libraries.");
         }
-        Connection conn = DriverManager.getConnection(URL);
+        try {
+        String resolved = resolveDbPath();
+       // System.out.println("Connecting SQLite: " + resolved);
+        Connection conn = DriverManager.getConnection("jdbc:sqlite:" + resolved);
         try (Statement s = conn.createStatement()) {
             s.execute("PRAGMA foreign_keys = ON;");
-            // jangan set WAL berulang-ubah jika tidak perlu, tapi boleh:
-            // s.execute("PRAGMA journal_mode = WAL;");
         } catch (SQLException ignore) {}
         return conn;
-    }
+        } catch (IOException ioe) {
+            throw new SQLException("Gagal resolve path DB: " + ioe.getMessage(), ioe);
+        }
 
 //    // ----- ensure sample pengguna exists even if DB file already existed -----
 //    private static void ensureSamplePengguna(Connection conn) {
@@ -392,6 +412,7 @@ public class DatabaseHelper {
 //        System.err.println("Gagal mengecek/menyisipkan sample pengguna: " + t.getMessage());
 //    }
 //}
+}
     
     public static String generateNextVoucherCode() throws SQLException {
     try (Connection conn = getConnection()) {
