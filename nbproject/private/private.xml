@@ -3,26 +3,9 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/uiresponsive/UIResponsive.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/transaksi_pembelian/transaksipembelian.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/laporan/laporanpembelian.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/barang/databarang.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/uiresponsive/Main.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/transaksi_penjualan/transaksipenjualan.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/uiresponsive/LoginDialog.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/laporan/laporanpenjualan.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/guru/dataguru.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/page/dashboard.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/transaksi_penjualan/TransactionDAO.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/uiresponsive/page.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/pengguna/editdatapengguna.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/pengguna/tambahdatapengguna.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/uiresponsive/Mainmenu.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/barang/tambahdatabarang.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/barang/editdatabarang.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/pengguna/Pengguna.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/kategori/datakategori.java</file>
-            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso-master/src/supplier/datasupplier.java</file>
+            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso/src/transaksi_penjualan/transaksipenjualan.java</file>
+            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso/src/uiresponsive/LoginDialog.java</file>
+            <file>file:/C:/Users/Billyy/Documents/NetBeansProjects/pos_smkn1bondowoso/src/transaksi_pembelian/transaksipembelian.java</file>
         </group>
     </open-files>
 </project-private>

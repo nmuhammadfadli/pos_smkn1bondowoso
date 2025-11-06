@@ -196,8 +196,8 @@ private void initHeader() {
         // Buttons Cancel & Reset
         JPanel tombolPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 10));
         tombolPanel.setOpaque(false);
-        btnCancel = createButton("Cancel", new Color(155, 89, 182), 120, 45);
-        btnReset = createButton("Reset", new Color(255,0,0), 120, 45);
+        btnCancel = createButton("Cancel", new Color(155, 89, 183), 120, 45);
+        btnReset = createButton("Reset", new Color(231, 76, 60), 120, 45);
         tombolPanel.add(btnCancel);
         tombolPanel.add(btnReset);
         tombolPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -211,23 +211,29 @@ private void initHeader() {
 
         JLabel lblVoucherLabel = new JLabel("Voucher (opsional):");
         lblVoucherLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-
+        lblVoucherLabel.setForeground(Color.white);
+        
         JLabel lblMetode = new JLabel("Metode Bayar:");
         lblMetode.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblMetode.setForeground(Color.WHITE);
 
         JLabel lblTotalLabel = new JLabel("Total Harga:");
         lblTotalLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblTotalLabel.setForeground(Color.WHITE);
 
         JLabel lblJumlahBayarLabel = new JLabel("Jumlah Bayar:");
         lblJumlahBayarLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblJumlahBayarLabel.setForeground(Color.WHITE);
 
         JLabel lblKembaliLabel = new JLabel("Kembali:");
         lblKembaliLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblKembaliLabel.setForeground(Color.WHITE);
 
         String[] metodeBayarOptions = {"Tunai", "Transfer Bank", "QRIS", "Debit"};
         JComboBox<String> cmbMetodeBayar = new JComboBox<>(metodeBayarOptions);
         cmbMetodeBayar.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         cmbMetodeBayar.setPreferredSize(new Dimension(200, 35));
+        cmbMetodeBayar.setBackground(Color.WHITE);
 
         txtVoucher = new JTextField();
         txtVoucher.setFont(new Font("Segoe UI", Font.PLAIN, 14));
