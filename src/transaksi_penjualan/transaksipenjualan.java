@@ -525,53 +525,110 @@ rightPanel.add(Box.createVerticalStrut(10));
         }
     }
 
-    private void onBayar() {
-        if (model.getRowCount() == 0) { JOptionPane.showMessageDialog(this, "Keranjang kosong."); return; }
+private void onBayar() {
+    if (model.getRowCount() == 0) {
+        JOptionPane.showMessageDialog(this, "Keranjang kosong.");
+        return;
+    }
 
-        List<SaleItem> items = new ArrayList<>();
-        try {
-            for (int i = 0; i < model.getRowCount(); i++) {
-                int idDetail = Integer.parseInt(model.getValueAt(i, 0).toString());
-                int qty = Integer.parseInt(model.getValueAt(i, 4).toString());
-                BigDecimal price = new BigDecimal(model.getValueAt(i, 3).toString());
-                items.add(new SaleItem(idDetail, qty, price));
+    // kumpulkan items
+    List<SaleItem> items = new ArrayList<>();
+    try {
+        for (int i = 0; i < model.getRowCount(); i++) {
+            int idDetail = Integer.parseInt(model.getValueAt(i, 0).toString());
+            int qty = Integer.parseInt(model.getValueAt(i, 4).toString());
+            BigDecimal price = new BigDecimal(model.getValueAt(i, 3).toString());
+            items.add(new SaleItem(idDetail, qty, price));
+        }
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, "Data keranjang rusak: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+
+    // total transaksi
+    BigDecimal total;
+    try {
+        total = new BigDecimal(lblTotal.getText().trim().replace(",",""));
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, "Total transaksi tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+
+    // cari voucher (jika diisi)
+    Integer voucherId = null;
+    String kodeVoucher = txtVoucher.getText().trim();
+    if (!kodeVoucher.isEmpty()) {
+        for (Voucher v : vouchers) {
+            if (v != null && kodeVoucher.equals(v.getKode())) {
+                voucherId = v.getIdVoucher();
+                break;
             }
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Data keranjang rusak: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // parse jumlah bayar
+    BigDecimal cashPaid = BigDecimal.ZERO;
+    String bayarStr = txtJumlahBayar.getText().trim();
+    if (voucherId == null) {
+        // TANPA VOUCHER => harus bayar tunai dan tunai >= total
+        if (bayarStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Masukkan nominal pembayaran tunai. Jika ingin kredit, pilih voucher terlebih dahulu.", "Pembayaran", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        Integer voucherId = null;
-        String kodeVoucher = txtVoucher.getText().trim();
-        if (!kodeVoucher.isEmpty()) {
-            for (Voucher v : vouchers) {
-                if (v != null && kodeVoucher.equals(v.getKode())) { voucherId = v.getIdVoucher(); break; }
-            }
-        }
-
-        BigDecimal cashPaid;
         try {
-            cashPaid = new BigDecimal(txtJumlahBayar.getText().trim().replace(",",""));
+            cashPaid = new BigDecimal(bayarStr.replace(",",""));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Format uang bayar tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
-
-        String kodeTrans = txtKode.getText();
-
-        try {
-            txDao.processSale(items, voucherId, cashPaid, kodeTrans, null); // ubah null ke user id bila perlu
-            JOptionPane.showMessageDialog(this, "Transaksi berhasil. Kode: " + kodeTrans, "Sukses", JOptionPane.INFORMATION_MESSAGE);
-
-            model.setRowCount(0);
-            updateTotal();
-            txtJumlahBayar.setText("0");
-            lblKembali.setText("0");
-            txtKode.setText(generateTransactionCode());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Gagal memproses transaksi: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        if (cashPaid.compareTo(total) < 0) {
+            JOptionPane.showMessageDialog(this, "Pembayaran tunai kurang. Jika ingin menyisakan hutang, pilih voucher terlebih dahulu.", "Pembayaran", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+    } else {
+        // DENGAN VOUCHER => boleh hutang => terima kosong atau nominal <= total
+        if (!bayarStr.isEmpty()) {
+            try {
+                cashPaid = new BigDecimal(bayarStr.replace(",",""));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Format uang bayar tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (cashPaid.compareTo(BigDecimal.ZERO) < 0) {
+                JOptionPane.showMessageDialog(this, "Nominal bayar tidak boleh negatif.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        } else {
+            cashPaid = BigDecimal.ZERO; // kosong dianggap 0 saat voucher dipakai
         }
     }
+
+    String kodeTrans = txtKode.getText();
+
+    try {
+        txDao.processSale(items, voucherId, cashPaid, kodeTrans, null); // ubah null ke user id bila perlu
+        JOptionPane.showMessageDialog(this, "Transaksi berhasil. Kode: " + kodeTrans, "Sukses", JOptionPane.INFORMATION_MESSAGE);
+
+        model.setRowCount(0);
+        updateTotal();
+        txtJumlahBayar.setText("0");
+        lblKembali.setText("0");
+        txtKode.setText(generateTransactionCode());
+
+        // reset field input juga (menyamakan perilaku sebelumnya)
+        resetFields();
+
+        // fokus kembali ke barcode setelah transaksi sukses
+        SwingUtilities.invokeLater(() -> {
+            if (txtBarcode != null) {
+                txtBarcode.requestFocusInWindow();
+                txtBarcode.selectAll();
+            }
+        });
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, "Gagal memproses transaksi: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
     // [FIX] Method baru untuk tombol cetak
     private void onCetak() {
         // TODO: Implementasikan logika untuk mencetak struk di sini
@@ -580,7 +637,15 @@ rightPanel.add(Box.createVerticalStrut(10));
         
         JOptionPane.showMessageDialog(this, "gass garap cetak wkwk.");
     }
-
+public void requestFokusKeBarcode() {
+    // Menggunakan invokeLater tetap penting untuk memastikan
+    // semua proses UI selesai sebelum fokus diminta.
+    SwingUtilities.invokeLater(() -> {
+        if (txtBarcode != null) {
+            txtBarcode.requestFocusInWindow();
+        }
+    });
+}
 
     // ========== Picker Frames ==========
 

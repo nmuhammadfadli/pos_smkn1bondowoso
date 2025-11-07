@@ -150,10 +150,18 @@ public class laporanpenjualan extends JPanel {
             loadTransactions(d1, d2);
         });
 
+        // ==========================================================
+        // ===== BLOK INI YANG DIPERBARUI SESUAI PERMINTAANMU =====
+        // ==========================================================
         bRefresh.addActionListener(e -> {
-            txtDari.setDate(null);
-            txtSampai.setDate(null);
-            loadTransactions(null, null);
+            // [PERUBAHAN] Set tanggal kembali ke hari ini
+            LocalDate today = LocalDate.now();
+            java.util.Date utilDate = java.sql.Date.valueOf(today);
+            txtDari.setDate(utilDate);
+            txtSampai.setDate(utilDate);
+            
+            // [PERUBAHAN] Load data untuk hari ini
+            loadTransactions(today, today);
         });
 
 
@@ -173,17 +181,19 @@ public class laporanpenjualan extends JPanel {
             }
         });
 
-        // initial load
-// initial load -> set tanggal hari ini
-LocalDate today = LocalDate.now();
-java.util.Date utilDate = java.sql.Date.valueOf(today);
-txtDari.setDate(utilDate);
-txtSampai.setDate(utilDate);
-loadTransactions(today, today);
+        // ==========================================================
+        // ===== BLOK INI SUDAH BENAR (START-UP LOAD) =====
+        // ==========================================================
+        // initial load -> set tanggal hari ini
+        LocalDate today = LocalDate.now();
+        java.util.Date utilDate = java.sql.Date.valueOf(today);
+        txtDari.setDate(utilDate);
+        txtSampai.setDate(utilDate);
+        loadTransactions(today, today);
     }
 
     // Load transactions, optionally filter by date range (inclusive)
-    private void loadTransactions(LocalDate dari, LocalDate sampai) {
+    public void loadTransactions(LocalDate dari, LocalDate sampai) {
         try {
             List<TransactionRecord> list = txDao.findAllTransactions();
             modelTrans.setRowCount(0);
@@ -239,7 +249,7 @@ loadTransactions(today, today);
             lblJumlahTransaksiValue.setText(String.valueOf(jumlahTrans));
             lblBarangTerjualValue.setText(String.valueOf(totalBarangTerjual));
             if (jumlahTrans == 0) lblRataRataValue.setText("Rp 0");
-            else lblRataRataValue.setText("Rp " + moneyFmt.format(totalPendapatan.divide(BigDecimal.valueOf(jumlahTrans)).longValue()));
+            else lblRataRataValue.setText("Rp " + moneyFmt.format(totalPendapatan.divide(BigDecimal.valueOf(jumlahTrans), java.math.RoundingMode.HALF_UP).longValue())); // Ditambahkan RoundingMode
         } catch (Exception ex) {
             lblTotalPendapatanValue.setText("Rp 0");
             lblJumlahTransaksiValue.setText("0");

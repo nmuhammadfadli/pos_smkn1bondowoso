@@ -35,6 +35,7 @@ import pengguna.tambahdatapengguna;
 import pengguna.editdatapengguna;
 import hutang.datahutang;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JOptionPane;
@@ -838,6 +839,7 @@ public void showTambahDataVoucher() {
     page.add(transaksipenjualanpanel);
     page.revalidate();
     page.repaint();     // TODO add your handling code here:
+        transaksipenjualanpanel.requestFokusKeBarcode();
     }//GEN-LAST:event_transaksipenjualanbtnActionPerformed
 
     private void datahutangbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_datahutangbtnActionPerformed
@@ -846,7 +848,23 @@ public void showTambahDataVoucher() {
     }//GEN-LAST:event_datahutangbtnActionPerformed
 
     private void keluarbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_keluarbtnActionPerformed
-    setActiveButton(keluarbtn);    // TODO add your handling code here:
+    setActiveButton(keluarbtn); 
+int pilihan = JOptionPane.showConfirmDialog(
+        this, // 'this' merujuk ke panel
+        "Anda yakin ingin keluar dan kembali ke halaman Login?",
+        "Konfirmasi Keluar",
+        JOptionPane.YES_NO_OPTION,
+        JOptionPane.QUESTION_MESSAGE
+    );
+
+    // 2. Hanya lakukan sesuatu jika user memilih "YA"
+    if (pilihan == JOptionPane.YES_OPTION) {
+
+        dispose();
+
+        LoginDialog loginDialog = new LoginDialog(null);
+        loginDialog.setVisible(true);
+    } // TODO add your handling code here:
     }//GEN-LAST:event_keluarbtnActionPerformed
 
     private void transaksipembelianbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_transaksipembelianbtnActionPerformed
@@ -862,7 +880,10 @@ public void showTambahDataVoucher() {
     page.removeAll();
     page.add(datalaporanpenjualanpanel);
     page.revalidate();
-    page.repaint();        // TODO add your handling code here:
+    page.repaint();     
+                LocalDate today = LocalDate.now();
+            java.util.Date utilDate = java.sql.Date.valueOf(today);
+    datalaporanpenjualanpanel.loadTransactions(today, today);// TODO add your handling code here:
     }//GEN-LAST:event_laporanpenjualanbtnActionPerformed
 
     private void laporanpembelianbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_laporanpembelianbtnActionPerformed
@@ -870,7 +891,8 @@ public void showTambahDataVoucher() {
     page.removeAll();
     page.add(datalaporanpembelianpanel);
     page.revalidate();
-    page.repaint();         // TODO add your handling code here:
+    page.repaint(); 
+    datalaporanpembelianpanel.loadTodayData();
     }//GEN-LAST:event_laporanpembelianbtnActionPerformed
 
     private void voucherbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_voucherbtnActionPerformed

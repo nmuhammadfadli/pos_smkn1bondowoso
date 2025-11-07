@@ -20,10 +20,6 @@ import transaksi_pembelian.PembelianDAO;
 import transaksi_pembelian.Pembelian;
 import transaksi_pembelian.DetailPembelian;
 
-/**
- * laporanpembelian - tampilkan data pembelian dari DB + ringkasan statistik.
- * Desain UI tidak diubah — hanya ditambahkan logika pengisian data.
- */
 public class laporanpembelian extends JPanel {
 
     // label value references agar dapat di-update
@@ -31,6 +27,13 @@ public class laporanpembelian extends JPanel {
     private JLabel lblJumlahPembelianValue;
     private JLabel lblBarangDibeliValue;
     private JLabel lblRataRataValue;
+
+    // [PERUBAHAN 1] Pindahkan model dan tabel ke sini agar bisa diakses
+    // oleh fungsi helper baru (loadTodayData)
+    private DefaultTableModel model;
+    private JTable tabel;
+    private com.toedter.calendar.JDateChooser txtDari;
+    private com.toedter.calendar.JDateChooser txtSampai;
 
     private final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -60,21 +63,16 @@ public class laporanpembelian extends JPanel {
         JLabel lblSampai = new JLabel("Sampai:");
         
         // === FILTER PANEL ===
-        com.toedter.calendar.JDateChooser txtDari = new com.toedter.calendar.JDateChooser();
+        // [PERUBAHAN 1] Inisialisasi field class, bukan variabel lokal
+        txtDari = new com.toedter.calendar.JDateChooser();
         txtDari.setDateFormatString("yyyy-MM-dd");
         txtDari.setPreferredSize(new Dimension(120, 28));
 
-        com.toedter.calendar.JDateChooser txtSampai = new com.toedter.calendar.JDateChooser();
+        txtSampai = new com.toedter.calendar.JDateChooser();
         txtSampai.setDateFormatString("yyyy-MM-dd");
         txtSampai.setPreferredSize(new Dimension(120, 28));
 
-        // set default tanggal ke hari ini
-        java.util.Date today = new java.util.Date();
-        txtDari.setDate(today);
-        txtSampai.setDate(today);
-
-
-
+        // (Penetapan tanggal dipindahkan ke loadTodayData())
 
         JButton btnFilter = createModernButton("Filter", new Color(33,150,243), 100, 36);
         JButton btnRefresh = createModernButton("Refresh", new Color(76,175,80), 100, 36);
@@ -90,10 +88,11 @@ public class laporanpembelian extends JPanel {
 
         // ===== TABEL PEMBELIAN =====
         String[] kolom = {"Tanggal", "Kode Pembelian", "Nama Barang", "Supplier", "Jumlah", "Harga", "Total"};
-        DefaultTableModel model = new DefaultTableModel(kolom, 0) {
+        // [PERUBAHAN 1] Inisialisasi field class, bukan variabel lokal
+        model = new DefaultTableModel(kolom, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
-        JTable tabel = new JTable(model);
+        tabel = new JTable(model); // <-- Hapus 'JTable'
         tabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         tabel.setRowHeight(28);
         tabel.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
@@ -148,145 +147,172 @@ public class laporanpembelian extends JPanel {
         mainPanel.add(rightPanel, BorderLayout.EAST);
         add(mainPanel, BorderLayout.CENTER);
         
-btnRefresh.addActionListener(e -> {
-    txtDari.setDate(today);
-    txtSampai.setDate(today);
-    LocalDate now = LocalDate.now();
-    loadAndPopulate(model, now, now);
-});
-    LocalDate now = LocalDate.now();
-    loadAndPopulate(model, now, now);
-    
-btnFilter.addActionListener(e -> {
-    LocalDate dari = null, sampai = null;
-    if (txtDari.getDate() != null)
-        dari = txtDari.getDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-    if (txtSampai.getDate() != null)
-        sampai = txtSampai.getDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        
+        // [PERUBAHAN 3] Panggil fungsi baru untuk Refresh
+        btnRefresh.addActionListener(e -> loadTodayData());
 
-    if (dari != null && sampai != null && sampai.isBefore(dari)) {
-        JOptionPane.showMessageDialog(this, "'Sampai' tidak boleh sebelum 'Dari'.",
-                "Rentang tanggal", JOptionPane.ERROR_MESSAGE);
-        return;
+        // [PERUBAHAN 3] Panggil fungsi baru untuk load awal
+        loadTodayData();
+        
+        // Listener Filter tetap seperti semula
+        btnFilter.addActionListener(e -> {
+            LocalDate dari = null, sampai = null;
+            if (txtDari.getDate() != null)
+                dari = txtDari.getDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            if (txtSampai.getDate() != null)
+                sampai = txtSampai.getDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+            if (dari != null && sampai != null && sampai.isBefore(dari)) {
+                JOptionPane.showMessageDialog(this, "'Sampai' tidak boleh sebelum 'Dari'.",
+                        "Rentang tanggal", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            // 'model' sekarang adalah field class, jadi bisa diakses
+            loadAndPopulate(model, dari, sampai); 
+        });
+
+
     }
-
-    loadAndPopulate(model, dari, sampai);
-});
-
-
-    }
     
+    
+    // =========================================================================
+    // [PERUBAHAN 2] INI FUNGSI BARU UNTUK LOAD DATA HARI INI
+    // =========================================================================
+    /**
+     * Fungsi helper baru untuk menyetel filter ke hari ini dan memuat data.
+     */
+    public void loadTodayData() {
+        LocalDate today = LocalDate.now();
+        
+        // JDateChooser memerlukan java.util.Date
+        java.util.Date utilDate = java.util.Date.from(
+            today.atStartOfDay(ZoneId.systemDefault()).toInstant()
+        );
+        
+        txtDari.setDate(utilDate);
+        txtSampai.setDate(utilDate);
+        
+        // Panggil fungsi load data utama dengan parameter hari ini
+        // 'model' sudah jadi field class, jadi bisa diakses
+        loadAndPopulate(model, today, today);
+    }
+    // =========================================================================
     
 
     /**
      * Muat data pembelian & detail dari DB, isi tabel model dan update ringkasan.
      * Jika dari/sampai kosong -> ambil semua.
      */
-private void loadAndPopulate(DefaultTableModel model, LocalDate dari, LocalDate sampai) {
-    model.setRowCount(0);
+    private void loadAndPopulate(DefaultTableModel model, LocalDate dari, LocalDate sampai) {
+        model.setRowCount(0);
 
-    long totalPengeluaran = 0L;
-    int jumlahPembelian = 0;
-    long jumlahBarangDibeli = 0L;
+        long totalPengeluaran = 0L;
+        int jumlahPembelian = 0;
+        long jumlahBarangDibeli = 0L;
 
-    NumberFormat nf = NumberFormat.getInstance(new Locale("in", "ID"));
-    DecimalFormat df = new DecimalFormat("#,###");
+        NumberFormat nf = NumberFormat.getInstance(new Locale("in", "ID"));
+        DecimalFormat df = new DecimalFormat("#,###");
 
-    try {
-        PembelianDAO pdao = new PembelianDAO();
-        List<Pembelian> purchases = pdao.findAllPembelian();
+        try {
+            PembelianDAO pdao = new PembelianDAO();
+            List<Pembelian> purchases = pdao.findAllPembelian();
 
-        List<Pembelian> filtered = new ArrayList<>();
-        for (Pembelian p : purchases) {
-            if (p == null || p.getTglPembelian() == null) continue;
+            List<Pembelian> filtered = new ArrayList<>();
+            for (Pembelian p : purchases) {
+                if (p == null || p.getTglPembelian() == null) continue;
 
-            LocalDate tgl = parseDateSafe(p.getTglPembelian());
-            if (tgl == null) continue;
+                LocalDate tgl = parseDateSafe(p.getTglPembelian());
+                if (tgl == null) continue;
 
-            if (dari != null && tgl.isBefore(dari)) continue;
-            if (sampai != null && tgl.isAfter(sampai)) continue;
+                if (dari != null && tgl.isBefore(dari)) continue;
+                if (sampai != null && tgl.isAfter(sampai)) continue;
 
-            filtered.add(p);
-        }
+                filtered.add(p);
+            }
 
-        // iterate filtered purchases and expand details into table rows
-        for (Pembelian p : filtered) {
-            List<DetailPembelian> dets = pdao.findDetailsByPembelian(p.getIdPembelian());
-            if (dets == null || dets.isEmpty()) {
-                // tampilkan satu baris kosong detail (jika tidak ada detail)
-                model.addRow(new Object[]{
-                        p.getTglPembelian(),
-                        p.getIdPembelian(),
-                        "-", // nama barang
-                        "-", // supplier
-                        0,
-                        0,
-                        p.getTotalHarga() == null ? 0 : p.getTotalHarga()
-                });
-                totalPengeluaran += p.getTotalHarga() == null ? 0 : p.getTotalHarga();
+            // iterate filtered purchases and expand details into table rows
+            for (Pembelian p : filtered) {
+                List<DetailPembelian> dets = pdao.findDetailsByPembelian(p.getIdPembelian());
+                if (dets == null || dets.isEmpty()) {
+                    // tampilkan satu baris kosong detail (jika tidak ada detail)
+                    model.addRow(new Object[]{
+                            p.getTglPembelian(),
+                            p.getIdPembelian(),
+                            "-", // nama barang
+                            "-", // supplier
+                            0,
+                            0,
+                            p.getTotalHarga() == null ? 0 : p.getTotalHarga()
+                    });
+                    totalPengeluaran += p.getTotalHarga() == null ? 0 : p.getTotalHarga();
+                    jumlahPembelian++;
+                    continue;
+                }
+
+                // jika ada detail, tampilkan masing-masing detail per baris
+                for (DetailPembelian d : dets) {
+                    String namaBarang = resolveNamaBarang(d.getIdBarang());
+                    String namaSupplier = resolveNamaSupplier(d.getIdSupplier());
+
+                    int qty = d.getStok() == null ? 0 : d.getStok();
+                    int harga = d.getHargaBeli() == null ? 0 : d.getHargaBeli();
+                    int subtotal = d.getSubtotal() == null
+                            ? (int) Math.min((long) qty * (long) harga, Integer.MAX_VALUE)
+                            : d.getSubtotal();
+
+                    model.addRow(new Object[]{
+                            p.getTglPembelian(),
+                            p.getIdPembelian(),
+                            namaBarang,
+                            namaSupplier,
+                            qty,
+                            harga,
+                            subtotal
+                    });
+
+                    totalPengeluaran += subtotal;
+                    jumlahBarangDibeli += qty;
+                }
+
                 jumlahPembelian++;
-                continue;
             }
 
-            // jika ada detail, tampilkan masing-masing detail per baris
-            for (DetailPembelian d : dets) {
-                String namaBarang = resolveNamaBarang(d.getIdBarang());
-                String namaSupplier = resolveNamaSupplier(d.getIdSupplier());
+            // update summary labels
+            lblTotalPengeluaranValue.setText("Rp " + df.format(totalPengeluaran));
+            lblJumlahPembelianValue.setText(String.valueOf(jumlahPembelian));
+            lblBarangDibeliValue.setText(String.valueOf(jumlahBarangDibeli));
 
-                int qty = d.getStok() == null ? 0 : d.getStok();
-                int harga = d.getHargaBeli() == null ? 0 : d.getHargaBeli();
-                int subtotal = d.getSubtotal() == null
-                        ? (int) Math.min((long) qty * (long) harga, Integer.MAX_VALUE)
-                        : d.getSubtotal();
+            if (jumlahPembelian > 0)
+                lblRataRataValue.setText("Rp " + df.format(totalPengeluaran / jumlahPembelian));
+            else
+                lblRataRataValue.setText("Rp " + df.format(0));
 
-                model.addRow(new Object[]{
-                        p.getTglPembelian(),
-                        p.getIdPembelian(),
-                        namaBarang,
-                        namaSupplier,
-                        qty,
-                        harga,
-                        subtotal
-                });
-
-                totalPengeluaran += subtotal;
-                jumlahBarangDibeli += qty;
-            }
-
-            jumlahPembelian++;
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Gagal memuat data pembelian:\n" + ex.getMessage(),
+                    "DB Error", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Error:\n" + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
-
-        // update summary labels
-        lblTotalPengeluaranValue.setText("Rp " + df.format(totalPengeluaran));
-        lblJumlahPembelianValue.setText(String.valueOf(jumlahPembelian));
-        lblBarangDibeliValue.setText(String.valueOf(jumlahBarangDibeli));
-
-        if (jumlahPembelian > 0)
-            lblRataRataValue.setText("Rp " + df.format(totalPengeluaran / jumlahPembelian));
-        else
-            lblRataRataValue.setText("Rp " + df.format(0));
-
-    } catch (SQLException ex) {
-        JOptionPane.showMessageDialog(this,
-                "Gagal memuat data pembelian:\n" + ex.getMessage(),
-                "DB Error", JOptionPane.ERROR_MESSAGE);
-    } catch (Exception ex) {
-        JOptionPane.showMessageDialog(this,
-                "Error:\n" + ex.getMessage(),
-                "Error", JOptionPane.ERROR_MESSAGE);
     }
-}
-private final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
+    
+    // ... (Sisa kode method helper lainnya seperti parseDateSafe, resolveNamaBarang, dll.
+    // tidak perlu diubah dan tetap di sini) ...
+    
+    private final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
 
-private LocalDate parseDateSafe(String s) {
-    try {
-        if (s == null || s.isEmpty()) return null;
-        if (s.length() >= 10) s = s.substring(0, 10);
-        return LocalDate.parse(s, ISO);
-    } catch (Exception ex) {
-        return null;
+    private LocalDate parseDateSafe(String s) {
+        try {
+            if (s == null || s.isEmpty()) return null;
+            if (s.length() >= 10) s = s.substring(0, 10);
+            return LocalDate.parse(s, ISO);
+        } catch (Exception ex) {
+            return null;
+        }
     }
-}
 
     /**
      * Resolve nama barang dari id (fallback ke "-" jika tidak ada).
@@ -474,4 +500,4 @@ private LocalDate parseDateSafe(String s) {
         frame.setVisible(true);
     }
     
-}
+}   
