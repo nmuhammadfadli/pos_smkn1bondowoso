@@ -244,7 +244,6 @@ private void initHeader() {
             BorderFactory.createLineBorder(new Color(200,200,200)),
             new EmptyBorder(6,8,6,8)
         ));
-
         // Tambahkan mouse listener biar kalau diklik buka frame voucher
         txtVoucher.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
