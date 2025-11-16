@@ -946,7 +946,7 @@ private void openPilihBarangFrame(JTextField targetField) {
 
     // trans code generator (sama)
     private String generateTransactionCode() {
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("ddMMyyyy"));
         String prefix = today;
         int next = 1;
         try (Connection conn = DatabaseHelper.getConnection();

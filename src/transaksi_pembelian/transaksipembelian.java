@@ -10,6 +10,8 @@ import java.util.List;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 import Helper.DatabaseHelper;
 import barang.DetailBarangDAO;
@@ -52,7 +54,7 @@ public class transaksipembelian extends JPanel {
 
         int x = 0, y = 0, fieldW = 450, fieldH = 38, gapY = 80;
 
-       JLabel lblKode = makeLabel("ID Pembelian:", x, y);
+        JLabel lblKode = makeLabel("ID Pembelian:", x, y);
         JTextField txtKode = makeField(x, y + 22, fieldW, fieldH);
 
         // tampilkan ID awal (generate jika memungkinkan)
@@ -63,9 +65,6 @@ public class transaksipembelian extends JPanel {
             // jika gagal (DB unreachable dsb) biarkan kosong — user bisa memasukkan manual
             txtKode.setText("");
         }
-        leftPanel.add(lblKode);
-        leftPanel.add(txtKode);
-
         leftPanel.add(lblKode);
         leftPanel.add(txtKode);
 
@@ -146,7 +145,7 @@ public class transaksipembelian extends JPanel {
             model.setRowCount(0);
             cart.clear();
         });
-            btnReset.addActionListener(e -> {
+        btnReset.addActionListener(e -> {
             // generate id baru untuk field kode (fall back ke kosong jika error)
             try {
                 txtKode.setText(generateNewIdPembelianLocal());
@@ -316,10 +315,19 @@ public class transaksipembelian extends JPanel {
             txtHarga.setText("");
             txtJumlah.setText("");
 
-            // update total di UI
+            // update total di UI (tanpa format, jadi parse tetap aman)
             int tot = cart.stream().mapToInt(DetailPembelian::getSubtotal).sum();
             txtTotalHarga.setText(String.valueOf(tot));
         });
+
+        // --- DocumentListener untuk update kembalian otomatis saat user mengetik ---
+        DocumentListener calcListener = new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { updateKembalian(txtTotalHarga, txtJumlahBayar, txtKembali); }
+            @Override public void removeUpdate(DocumentEvent e) { updateKembalian(txtTotalHarga, txtJumlahBayar, txtKembali); }
+            @Override public void changedUpdate(DocumentEvent e) { updateKembalian(txtTotalHarga, txtJumlahBayar, txtKembali); }
+        };
+        txtJumlahBayar.getDocument().addDocumentListener(calcListener);
+        txtTotalHarga.getDocument().addDocumentListener(calcListener);
 
         // aksi selesai: buat Pembelian object dan simpan via PembelianDAO
         btnSelesai.addActionListener(e -> {
@@ -335,33 +343,74 @@ public class transaksipembelian extends JPanel {
                     idPembelian = generateNewIdPembelianLocal();
                 }
 
+                // hitung total dari cart
+                int totalHarga = cart.stream().mapToInt(DetailPembelian::getSubtotal).sum();
+                // tampilkan total di UI (jika Anda ingin format, ganti dengan NumberFormat)
+                txtTotalHarga.setText(String.valueOf(totalHarga));
+
+                // baca metode bayar dan jumlah bayar dari UI
+                String metodeBayar = String.valueOf(cmbMetodeBayar.getSelectedItem());
+                String jumlahBayarStr = txtJumlahBayar.getText().trim();
+
+                int jumlahBayar = 0;
+                if (!jumlahBayarStr.isEmpty()) {
+                    try {
+                        // hapus karakter non-digit (mis. format ribuan) lalu parse
+                        jumlahBayar = Integer.parseInt(jumlahBayarStr.replaceAll("[^0-9]", ""));
+                    } catch (NumberFormatException ex) {
+                        JOptionPane.showMessageDialog(this, "Jumlah bayar harus berupa angka.", "Validasi", JOptionPane.WARNING_MESSAGE);
+                        txtJumlahBayar.requestFocus();
+                        return;
+                    }
+                }
+
+                // VALIDASI: jika metode = Cash, jumlahBayar harus >= totalHarga
+                if ("Cash".equalsIgnoreCase(metodeBayar)) {
+                    if (jumlahBayar < totalHarga) {
+                        JOptionPane.showMessageDialog(this,
+                                "Jumlah bayar tidak boleh kurang dari total harga untuk metode Cash.",
+                                "Validasi Pembayaran",
+                                JOptionPane.WARNING_MESSAGE);
+                        txtJumlahBayar.requestFocus();
+                        return;
+                    }
+                }
+
+                // hitung kembalian (boleh negatif hanya jika logic lain mengizinkan; di sini kita pastikan non-negatif)
+                int kembali = Math.max(0, jumlahBayar - totalHarga);
+                txtKembali.setText(String.valueOf(kembali));
+
+                // buat model Pembelian dan simpan
                 Pembelian p = new Pembelian();
                 p.setIdPembelian(idPembelian);
                 p.setTglPembelian(LocalDate.now().toString());
-                p.setPaymentMethod((String) cmbMetodeBayar.getSelectedItem());
-                int totalHarga = cart.stream().mapToInt(DetailPembelian::getSubtotal).sum();
+                p.setPaymentMethod(metodeBayar);
                 p.setTotalHarga(totalHarga);
                 p.setDetails(new ArrayList<>(cart));
+
+                // Jika model Pembelian punya field jumlahBayar/kembali, set di sini (contoh, uncomment jika ada metode tersebut):
+                // p.setJumlahBayar(jumlahBayar);
+                // p.setKembalian(kembali);
 
                 PembelianDAO dao = new PembelianDAO();
                 dao.insertPembelianWithDetails(p);
 
                 JOptionPane.showMessageDialog(this, "Transaksi berhasil disimpan! ID: " + idPembelian, "Sukses", JOptionPane.INFORMATION_MESSAGE);
-                // bersihkan
-                // bersihkan
-            model.setRowCount(0);
-            cart.clear();
 
-            // set new generated id agar siap untuk transaksi berikutnya
-            try {
-                txtKode.setText(generateNewIdPembelianLocal());
-            } catch (Exception ex) {
-                txtKode.setText("");
-            }
+                // bersihkan UI setelah sukses
+                model.setRowCount(0);
+                cart.clear();
 
-            txtTotalHarga.setText("");
-            txtJumlahBayar.setText("");
-            txtKembali.setText("");
+                // set new generated id agar siap untuk transaksi berikutnya
+                try {
+                    txtKode.setText(generateNewIdPembelianLocal());
+                } catch (Exception ex) {
+                    txtKode.setText("");
+                }
+
+                txtTotalHarga.setText("");
+                txtJumlahBayar.setText("");
+                txtKembali.setText("");
 
             } catch (SQLException ex) {
                 JOptionPane.showMessageDialog(this, "Gagal menyimpan transaksi:\n" + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
@@ -369,6 +418,7 @@ public class transaksipembelian extends JPanel {
                 JOptionPane.showMessageDialog(this, "Error:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
+
 
         // ======== Gabungkan Semua ========
         content.add(leftPanel);
@@ -447,6 +497,29 @@ public class transaksipembelian extends JPanel {
         button.setFont(new Font("Segoe UI Semibold", Font.BOLD, 14));
         button.setPreferredSize(new Dimension(width, height));
         return button;
+    }
+
+    // helper untuk parsing angka dari field (menghapus pemisah ribuan dll)
+    private int parseCurrencyField(JTextField field) {
+        String s = field.getText().trim().replaceAll("[^0-9]", "");
+        if (s.isEmpty()) return 0;
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    // helper untuk update kembalian
+    private void updateKembalian(JTextField txtTotalHarga, JTextField txtJumlahBayar, JTextField txtKembali) {
+        int total = parseCurrencyField(txtTotalHarga);
+        int bayar = parseCurrencyField(txtJumlahBayar);
+        int kembali = bayar - total;
+        if (kembali > 0) {
+            txtKembali.setText(String.valueOf(kembali)); // atau format dengan NumberFormat
+        } else {
+            txtKembali.setText("0"); // atau kosong: ""
+        }
     }
 
     // generate new id pembelian local (mengikuti logika di PembelianDAO)
@@ -660,32 +733,33 @@ public class transaksipembelian extends JPanel {
                 JOptionPane.showMessageDialog(this, "Gagal memuat barang:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
+
         private String generatePembelianId() {
-    String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("ddMMyyyy"));
-    int nextNumber = 1;
+            String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("ddMMyyyy"));
+            int nextNumber = 1;
 
-    // ambil ID terakhir dari tabel pembelian yang sesuai tanggal hari ini
-    try (java.sql.Connection conn = DatabaseHelper.getConnection();
-         java.sql.PreparedStatement ps = conn.prepareStatement(
-                 "SELECT id_pembelian FROM data_pembelian WHERE id_pembelian LIKE ? ORDER BY id_pembelian DESC LIMIT 1")) {
-        ps.setString(1, today + "%");
-        try (java.sql.ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                String lastId = rs.getString(1); // contoh: 221020250005
-                String seqStr = lastId.substring(8); // ambil 0005
-                try {
-                    nextNumber = Integer.parseInt(seqStr) + 1;
-                } catch (NumberFormatException ignored) {}
+            // ambil ID terakhir dari tabel pembelian yang sesuai tanggal hari ini
+            try (java.sql.Connection conn = DatabaseHelper.getConnection();
+                 java.sql.PreparedStatement ps = conn.prepareStatement(
+                         "SELECT id_pembelian FROM data_pembelian WHERE id_pembelian LIKE ? ORDER BY id_pembelian DESC LIMIT 1")) {
+                ps.setString(1, today + "%");
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        String lastId = rs.getString(1); // contoh: 221020250005
+                        String seqStr = lastId.substring(8); // ambil 0005
+                        try {
+                            nextNumber = Integer.parseInt(seqStr) + 1;
+                        } catch (NumberFormatException ignored) {}
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Gagal cek ID terakhir: " + e.getMessage());
             }
-        }
-    } catch (Exception e) {
-        System.err.println("Gagal cek ID terakhir: " + e.getMessage());
-    }
 
-    // format ke 4 digit (misal 0001)
-    String newSeq = String.format("%04d", nextNumber);
-    return today + newSeq;
-}
+            // format ke 4 digit (misal 0001)
+            String newSeq = String.format("%04d", nextNumber);
+            return today + newSeq;
+        }
 
 
         private void styleButton(JButton btn, Color color) {
