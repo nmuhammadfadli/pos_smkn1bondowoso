@@ -94,7 +94,7 @@ public class ReceivableDAO {
             ps.setString(2, r.getAmountTotal() == null ? "0" : r.getAmountTotal().toPlainString());
             ps.setString(3, r.getAmountPaid() == null ? "0" : r.getAmountPaid().toPlainString());
             ps.setString(4, r.getAmountOutstanding() == null ? "0" : r.getAmountOutstanding().toPlainString());
-            ps.setString(5, r.getStatus() == null ? "OPEN" : r.getStatus());
+            ps.setString(5, r.getStatus() == null ? "Belum Dibayar" : r.getStatus());
             ps.executeUpdate();
             try (ResultSet gk = ps.getGeneratedKeys()) {
                 if (gk.next()) return gk.getInt(1);
@@ -134,7 +134,7 @@ public class ReceivableDAO {
                     newOutstanding = BigDecimal.ZERO;
                 }
 
-                String newStatus = (newOutstanding.compareTo(BigDecimal.ZERO) == 0) ? "PAID" : "PARTIAL";
+                String newStatus = (newOutstanding.compareTo(BigDecimal.ZERO) == 0) ? "Terbayar" : "Cicilan";
 
                 String upd = "UPDATE receivable SET amount_paid = ?, amount_outstanding = ?, status = ? WHERE id_receivable = ?";
                 try (PreparedStatement ps = conn.prepareStatement(upd)) {
@@ -155,27 +155,33 @@ public class ReceivableDAO {
         }
     }
 
-    private Receivable readFromResultSet(ResultSet rs) throws SQLException {
-        Receivable r = new Receivable();
-        r.setIdReceivable(rs.getInt("id_receivable"));
-        r.setIdTransaksi(rs.getLong("id_transaksi"));
+private Receivable readFromResultSet(ResultSet rs) throws SQLException {
+    Receivable r = new Receivable();
+    r.setIdReceivable(rs.getInt("id_receivable"));
+    r.setIdTransaksi(rs.getLong("id_transaksi"));
 
-        String at = rs.getString("amount_total");
-        String ap = rs.getString("amount_paid");
-        String ao = rs.getString("amount_outstanding");
-        r.setAmountTotal(at == null || at.trim().isEmpty() ? BigDecimal.ZERO : new BigDecimal(at));
-        r.setAmountPaid(ap == null || ap.trim().isEmpty() ? BigDecimal.ZERO : new BigDecimal(ap));
-        r.setAmountOutstanding(ao == null || ao.trim().isEmpty() ? BigDecimal.ZERO : new BigDecimal(ao));
+    String at = rs.getString("amount_total");
+    String ap = rs.getString("amount_paid");
+    String ao = rs.getString("amount_outstanding");
+    r.setAmountTotal(at == null || at.trim().isEmpty() ? BigDecimal.ZERO : new BigDecimal(at));
+    r.setAmountPaid(ap == null || ap.trim().isEmpty() ? BigDecimal.ZERO : new BigDecimal(ap));
+    r.setAmountOutstanding(ao == null || ao.trim().isEmpty() ? BigDecimal.ZERO : new BigDecimal(ao));
 
-        r.setCreatedAt(rs.getString("created_at"));
-        r.setStatus(rs.getString("status"));
+    r.setCreatedAt(rs.getString("created_at"));
+    r.setStatus(rs.getString("status"));
 
-        // voucher / owner info (nullable)
-        int vid = rs.getInt("voucher_id");
-        if (rs.wasNull()) r.setVoucherId(null); else r.setVoucherId(vid);
-        r.setVoucherCode(rs.getString("voucher_code"));
-        r.setOwnerName(rs.getString("owner_name"));
-
-        return r;
+    // --- owner_name handling: tampilkan "sekolah" bila null / empty / '-' ---
+    String owner = rs.getString("owner_name");
+    if (owner == null || owner.trim().isEmpty() || "-".equals(owner.trim())) {
+        owner = "sekolah";
     }
+    r.setOwnerName(owner);
+
+    // voucher info (nullable)
+    int vid = rs.getInt("voucher_id");
+    if (rs.wasNull()) r.setVoucherId(null); else r.setVoucherId(vid);
+    r.setVoucherCode(rs.getString("voucher_code"));
+
+    return r;
+}
 }

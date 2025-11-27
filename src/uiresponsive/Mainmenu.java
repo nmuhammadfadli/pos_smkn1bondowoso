@@ -303,6 +303,7 @@ public void showTambahDetailBarang() {
     page.revalidate();
     page.repaint();
 }
+
 public void showEditDataBarang() {
     page.removeAll();
     page.add(editDataBarangPanel);

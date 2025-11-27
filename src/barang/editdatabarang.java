@@ -10,9 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.table.DefaultTableModel;
 
-// [FIX] Impor yang diperlukan untuk JDateChooser dan format tanggal
 import com.toedter.calendar.JDateChooser;
 import java.util.Date;
 import java.text.SimpleDateFormat;
@@ -21,28 +19,30 @@ import java.text.ParseException;
 import Helper.DatabaseHelper;
 
 /**
- * editdatabarang - versi yang mengisi field otomatis dan menyimpan perubahan ke DB
- * Fokus perbaikan: Menggunakan JDateChooser untuk input tanggal expired.
+ * editdatabarang - layout fixed:
+ * Row0: Kode | Barcode | Stok
+ * Row1: Harga Jual | Expired | (spacer)
+ * Row2: Nama Barang | Kategori | Supplier
+ *
+ * Kategori & Supplier hanya editable di per-detail mode.
  */
 public class editdatabarang extends JPanel {
-    // input fields (digunakan ulang di seluruh class)
     private RoundedTextField txtKode;
-    private RoundedTextField txtNama;
-    private RoundedTextField txtKategori;
     private RoundedTextField txtBarcode;
     private RoundedTextField txtStok;
     private RoundedTextField txtHarga;
-    private JDateChooser dateExpired; // [FIX] Diganti dari RoundedTextField
+    private JDateChooser dateExpired;
+    private RoundedTextField txtNama;
+    private RoundedTextField txtKategori;
+    private RoundedTextField txtSupplier;
 
-    // menyimpan id kategori yang dipilih (penting untuk update)
     private String selectedKategoriId = null;
+    private String selectedSupplierId = null;
 
-    // DAO
     private BarangDAO barangDao;
     private DetailBarangDAO detailDao;
 
     public editdatabarang() {
-        // init DAO
         try {
             barangDao = new BarangDAO();
             detailDao = new DetailBarangDAO();
@@ -54,183 +54,103 @@ public class editdatabarang extends JPanel {
 
         setLayout(new BorderLayout());
         setBackground(new Color(236,236,236));
-        setBorder(new EmptyBorder(30, 50, 30, 50));
+        setBorder(new EmptyBorder(20, 40, 20, 40));
 
-        // ===== Bagian atas =====
         JLabel title = new JLabel("Edit Data Barang", SwingConstants.CENTER);
-        title.setFont(new Font("Segoe UI Semibold", Font.BOLD, 24));
+        title.setFont(new Font("Segoe UI Semibold", Font.BOLD, 22));
         title.setForeground(new Color(40, 40, 40));
 
+        // Tambahkan icon/gambar tanpa mengubah UI lain
         JLabel imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        imageLabel.setIcon(new ImageIcon(getClass().getResource("/Icon/tambahbarang.png"))); // ganti sesuai path
+        try {
+            // gunakan resource path yang sama seperti versi sebelumnya
+            ImageIcon ic = new ImageIcon(getClass().getResource("/Icon/tambahbarang.png"));
+            imageLabel.setIcon(ic);
+        } catch (Exception ex) {
+            // jika resource tidak ditemukan, biarkan kosong (tidak mengganggu UI)
+            imageLabel.setText("");
+        }
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
         topPanel.add(title, BorderLayout.NORTH);
         topPanel.add(imageLabel, BorderLayout.CENTER);
 
-        // ===== Form input (tengah) =====
-        JPanel formPanel = new JPanel(new GridBagLayout());
-        formPanel.setOpaque(false);
-        formPanel.setBorder(new EmptyBorder(40, 0, 0, 0));
-
+        // Form with GridBag: explicit placement for each cell (comfortable to read)
+        JPanel form = new JPanel(new GridBagLayout());
+        form.setOpaque(false);
+        form.setBorder(new EmptyBorder(20, 0, 10, 0));
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 15, 10, 15);
+        gbc.insets = new Insets(8, 12, 8, 12);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
 
-        // Baris input - sekarang menyimpan referensi field agar dapat diisi
-        txtKode = addField(formPanel, gbc, 0, "Kode Barang:");
-        txtNama = addField(formPanel, gbc, 1, "Nama Barang:");
-        txtKategori = addField(formPanel, gbc, 2, "Kategori Barang:");
-        txtBarcode = addField(formPanel, gbc, 3, "Barcode:");
-        txtStok = addField(formPanel, gbc, 4, "Stok:");
-        txtHarga = addField(formPanel, gbc, 5, "Harga Jual:");
-        
-        // [FIX] Hapus baris ini:
-        // txtExpired = addField(formPanel, gbc, 6, "Expired:");
+        // Row 0: Kode | Barcode | Stok
+        gbc.gridx = 0; gbc.gridy = 0;
+        txtKode = createField(form, gbc, "Kode Barang:");
+        gbc.gridx = 1;
+        txtBarcode = createField(form, gbc, "Barcode:");
+        gbc.gridx = 2;
+        txtStok = createField(form, gbc, "Stok:");
 
-        // [FIX] Tambahkan JDateChooser secara manual
-        gbc.gridx = 6 % 3; // Kolom 0
-        gbc.gridy = 6 / 3; // Baris 2
+        // Row 1: Harga Jual | Expired | spacer
+        gbc.gridx = 0; gbc.gridy = 1;
+        txtHarga = createField(form, gbc, "Harga Jual:");
+        gbc.gridx = 1;
+        JPanel expirePanel = new JPanel(new BorderLayout(4,4)); expirePanel.setOpaque(false);
+        JLabel lblExp = new JLabel("Expired:"); lblExp.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        dateExpired = new JDateChooser(); dateExpired.setDateFormatString("yyyy-MM-dd"); dateExpired.setPreferredSize(new Dimension(0, 36));
+        expirePanel.add(lblExp, BorderLayout.NORTH);
+        expirePanel.add(dateExpired, BorderLayout.CENTER);
+        form.add(expirePanel, gbc);
+        gbc.gridx = 2;
+        form.add(Box.createHorizontalStrut(10), gbc);
 
-        JPanel expiredPanel = new JPanel(new BorderLayout(5, 5));
-        expiredPanel.setOpaque(false);
-        JLabel lblExpired = new JLabel("Expired:");
-        lblExpired.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        // Row 2: Nama Barang | Kategori | Supplier
+        gbc.gridx = 0; gbc.gridy = 2;
+        txtNama = createField(form, gbc, "Nama Barang:");
+        gbc.gridx = 1;
+        txtKategori = createField(form, gbc, "Kategori Barang:");
+        gbc.gridx = 2;
+        txtSupplier = createField(form, gbc, "Supplier:");
 
-        dateExpired = new JDateChooser();
-        dateExpired.setDateFormatString("yyyy-MM-dd"); // Format tanggal SQL
-        dateExpired.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        // Atur tinggi agar konsisten dengan field lain (tinggi RoundedTextField sekitar 38px)
-        dateExpired.setPreferredSize(new Dimension(0, 38)); 
-
-        expiredPanel.add(lblExpired, BorderLayout.NORTH);
-        expiredPanel.add(dateExpired, BorderLayout.CENTER);
-        formPanel.add(expiredPanel, gbc);
-
-
-        // Kategori clickable: panggil PilihKategoriFrame yang juga set selectedKategoriId
+        // kategori & supplier behave as pickers (click) but only enabled in per-detail
         txtKategori.setEditable(false);
         txtKategori.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         txtKategori.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                new PilihKategoriFrame(txtKategori);
+            @Override public void mouseClicked(MouseEvent e) {
+                if (txtKategori.isEnabled()) new PilihKategoriFrame(txtKategori);
             }
         });
 
-        // ===== Tombol =====
-        RoundedButton btnKembali = new RoundedButton("Kembali", new Color(235, 235, 235), new Color(60, 60, 60));
-        RoundedButton btnSimpan = new RoundedButton("Simpan", new Color(46, 204, 113), Color.WHITE);
-
-        btnKembali.setPreferredSize(new Dimension(140, 45));
-        btnSimpan.setPreferredSize(new Dimension(140, 45));
-
-        btnSimpan.addActionListener(e -> {
-            // lakukan update barang + first detail
-            Integer editingId = null;
-            try {
-                editingId = BarangContext.editingId;
-            } catch (Throwable t) { editingId = null; }
-
-            if (editingId == null) {
-                JOptionPane.showMessageDialog(this, "Tidak ada ID barang yang sedang diedit.", "Validasi", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            if (barangDao == null || detailDao == null) {
-                JOptionPane.showMessageDialog(this, "DAO belum terinisialisasi.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            // ambil nilai dari form
-            String nama = txtNama.getText().trim();
-            String kategoriId = selectedKategoriId;
-
-            // Jika selectedKategoriId belum di-set (mis. user ketik/diisi dari load),
-            // cari id_kategori dari nama kategori di DB (sama seperti di tambahdatabarang)
-            if ((kategoriId == null || kategoriId.trim().isEmpty()) && txtKategori.getText() != null && !txtKategori.getText().trim().isEmpty()) {
-                kategoriId = getKategoriIdByName(txtKategori.getText().trim());
-            }
-
-            if (nama.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Nama barang tidak boleh kosong.", "Validasi", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-
-            try {
-                // 1) update barang
-                Barang b = new Barang();
-                b.setId(editingId);
-                b.setNama(nama);
-                b.setIdKategori(kategoriId); // bisa null
-                barangDao.update(b);
-
-                // 2) update first detail jika ada
-                List<DetailBarang> dets = detailDao.findByBarangId(editingId);
-                if (dets != null && !dets.isEmpty()) {
-                    DetailBarang d = dets.get(0); // first detail
-                    d.setBarcode(txtBarcode.getText().trim());
-
-                    // stok
-                    int stok = 0;
-                    try { stok = Integer.parseInt(txtStok.getText().trim()); } catch (Exception ex) { stok = d.getStok(); }
-                    d.setStok(stok);
-
-                    // harga: parse dari format lokal, jika kosong biarkan nilai lama
-                    String hargaText = txtHarga.getText().trim();
-                    if (!hargaText.isEmpty()) {
-                        String cleaned = cleanNumberString(hargaText);
-                        try {
-                            d.setHargaJual(new BigDecimal(cleaned));
-                        } catch (Exception ex) {
-                            // jika parsing gagal, jangan override
-                        }
-                    }
-                    
-                    // [FIX] Ambil tanggal dari JDateChooser
-                    Date expDate = dateExpired.getDate();
-                    if (expDate != null) {
-                        // Format tanggalnya ke String standar SQL "yyyy-MM-dd"
-                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                        d.setTanggalExp(sdf.format(expDate));
-                    } else {
-                        d.setTanggalExp(null); // Kosongkan jika tidak diisi
-                    }
-
-                    // lakukan update
-                    detailDao.update(d);
-                }
-
-                JOptionPane.showMessageDialog(this, "✅ Perubahan disimpan.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
-
-                JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-                if (frame instanceof uiresponsive.Mainmenu) {
-                    ((uiresponsive.Mainmenu) frame).showDataBarangPanel();
-                }
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this, "Gagal menyimpan perubahan:\n" + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+        txtSupplier.setEditable(false);
+        txtSupplier.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        txtSupplier.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                if (txtSupplier.isEnabled()) new PilihSupplierFrame(txtSupplier);
             }
         });
-        btnKembali.addActionListener(e -> {
+
+        // Buttons
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 12));
+        btnPanel.setOpaque(false);
+        RoundedButton btnBack = new RoundedButton("Kembali", new Color(230,230,230), new Color(60,60,60));
+        RoundedButton btnSave = new RoundedButton("Simpan", new Color(46,204,113), Color.WHITE);
+        btnBack.setPreferredSize(new Dimension(140,42));
+        btnSave.setPreferredSize(new Dimension(140,42));
+        btnBack.addActionListener(e -> {
             JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-            if (frame instanceof uiresponsive.Mainmenu) {
-                ((uiresponsive.Mainmenu) frame).showDataBarangPanel();
-            }
+            if (frame instanceof uiresponsive.Mainmenu) ((uiresponsive.Mainmenu) frame).showDataBarangPanel();
         });
+        btnSave.addActionListener(e -> saveAction());
+        btnPanel.add(btnBack); btnPanel.add(btnSave);
 
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 25, 10));
-        bottomPanel.setOpaque(false);
-        bottomPanel.add(btnKembali);
-        bottomPanel.add(btnSimpan);
-
-        // ===== Tambahkan ke panel utama =====
         add(topPanel, BorderLayout.NORTH);
-        add(formPanel, BorderLayout.CENTER);
-        add(bottomPanel, BorderLayout.SOUTH);
+        add(form, BorderLayout.CENTER);
+        add(btnPanel, BorderLayout.SOUTH);
 
-        // === penting: pas panel tampil, load data dari context
+        // load on show
         this.addHierarchyListener(e -> {
             if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
                 SwingUtilities.invokeLater(() -> loadFromContext());
@@ -238,316 +158,400 @@ public class editdatabarang extends JPanel {
         });
     }
 
-    /**
-     * Memuat data barang + detail ke field ketika panel ditampilkan.
-     * Menggunakan BarangContext.editingId (harus berupa Integer).
-     */
-    private void loadFromContext() {
+    private RoundedTextField createField(JPanel parent, GridBagConstraints gbc, String labelText) {
+        JPanel p = new JPanel(new BorderLayout(6,6)); p.setOpaque(false);
+        JLabel lbl = new JLabel(labelText); lbl.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        RoundedTextField tf = new RoundedTextField(12);
+        tf.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        p.add(lbl, BorderLayout.NORTH);
+        p.add(tf, BorderLayout.CENTER);
+        parent.add(p, gbc);
+        return tf;
+    }
+
+    private void saveAction() {
         Integer editingId = null;
-        try {
-            editingId = BarangContext.editingId;
-        } catch (Throwable t) {
-            editingId = null;
+        try { editingId = BarangContext.editingId; } catch (Throwable t) { editingId = null; }
+        Integer editingDetailId = null;
+        try { editingDetailId = DetailContext.editingDetailId; } catch (Throwable t) { editingDetailId = null; }
+
+        if (editingId == null && editingDetailId == null) {
+            JOptionPane.showMessageDialog(this, "Tidak ada ID yang sedang diedit.", "Validasi", JOptionPane.WARNING_MESSAGE);
+            return;
         }
-
-        // kosongkan form terlebih dahulu
-        clearFormFields();
-        selectedKategoriId = null;
-
-        if (editingId == null) {
-            // mode tambah (atau tidak ada data) -> biarkan kosong
+        if (barangDao == null || detailDao == null) {
+            JOptionPane.showMessageDialog(this, "DAO belum terinisialisasi.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        if (barangDao == null) {
-            JOptionPane.showMessageDialog(this, "Database tidak tersedia (barangDao null).", "Error", JOptionPane.ERROR_MESSAGE);
+        String nama = txtNama.getText().trim();
+
+        // resolve kategori & supplier ids if text provided
+        String kategoriId = selectedKategoriId;
+        if ((kategoriId == null || kategoriId.trim().isEmpty()) && txtKategori.getText() != null && !txtKategori.getText().trim().isEmpty()) {
+            kategoriId = getKategoriIdByName(txtKategori.getText().trim());
+        }
+        String supplierId = selectedSupplierId;
+        if ((supplierId == null || supplierId.trim().isEmpty()) && txtSupplier.getText() != null && !txtSupplier.getText().trim().isEmpty()) {
+            supplierId = getSupplierIdByName(txtSupplier.getText().trim());
+        }
+
+        if (nama.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Nama barang tidak boleh kosong.", "Validasi", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         try {
-            // karena BarangDAO yang diberikan hanya findAll(), kita cari di list
-            List<Barang> all = barangDao.findAll();
-            Barang target = null;
-            if (all != null) {
-                for (Barang b : all) {
-                    if (b.getId() == editingId) {
-                        target = b;
-                        break;
+            // update barang if editingId present (group mode or per-detail updating category)
+            if (editingId != null) {
+                Barang b = new Barang();
+                b.setId(editingId);
+                b.setNama(nama);
+                // update kategori only if user selected / in per-detail mode we will update anyway
+                if (kategoriId != null && !kategoriId.trim().isEmpty()) b.setIdKategori(kategoriId);
+                barangDao.update(b);
+            }
+
+            // determine target detail
+            DetailBarang target = null;
+            if (editingDetailId != null) target = detailDao.findById(editingDetailId);
+            else if (editingId != null) {
+                List<DetailBarang> dets = detailDao.findByBarangId(editingId);
+                if (dets != null && !dets.isEmpty()) target = dets.get(0);
+            }
+
+            if (target != null) {
+                target.setBarcode(txtBarcode.getText().trim());
+                try { target.setStok(Integer.parseInt(txtStok.getText().trim())); } catch (Exception ex) { /* keep */ }
+
+                String h = txtHarga.getText().trim();
+                if (!h.isEmpty()) {
+                    String cleaned = cleanNumberString(h);
+                    try { target.setHargaJual(new BigDecimal(cleaned)); } catch (Exception ex) {}
+                }
+
+                Date d = dateExpired.getDate();
+                if (d != null) {
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                    target.setTanggalExp(sdf.format(d));
+                } else target.setTanggalExp(null);
+
+                // supplier only saved in per-detail mode
+                if (editingDetailId != null) {
+                    if (supplierId != null && !supplierId.trim().isEmpty()) {
+                        try { target.setIdSupplier(Integer.valueOf(supplierId)); } catch (Exception ex) {}
+                    } else {
+                        target.setIdSupplier(null);
                     }
+                }
+
+                detailDao.update(target);
+
+                // if user changed kategori in per-detail mode, update parent barang (ensure id obtained)
+                if (editingDetailId != null && kategoriId != null && !kategoriId.trim().isEmpty()) {
+                    Barang parent = new Barang();
+                    parent.setId(target.getIdBarang());
+                    parent.setNama(nama);
+                    parent.setIdKategori(kategoriId);
+                    barangDao.update(parent);
                 }
             }
 
-            if (target == null) {
-                JOptionPane.showMessageDialog(this, "Data barang (ID: " + editingId + ") tidak ditemukan.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            // isi field dari objek Barang
-            txtKode.setText(String.valueOf(target.getId()));
-            txtNama.setText(target.getNama() == null ? "" : target.getNama());
-            // simpan kategori id agar saat save kita tahu id_kategori
-            selectedKategoriId = target.getIdKategori();
-            // tampilkan nama kategori (jika ada)
-            txtKategori.setText(target.getNamaKategori() == null ? "" : target.getNamaKategori());
-
-            // Ambil detail (pakai detailDao.findByBarangId), gunakan detail pertama sebagai contoh:
-            if (detailDao != null) {
-                List<DetailBarang> dets = detailDao.findByBarangId(target.getId());
-                if (dets != null && !dets.isEmpty()) {
-                    DetailBarang d = dets.get(0); // representative
-                    txtBarcode.setText(d.getBarcode() == null ? "" : d.getBarcode());
-                    txtStok.setText(String.valueOf(d.getStok()));
-                    if (d.getHargaJual() != null) {
-                        NumberFormat nf = NumberFormat.getInstance(new Locale("in","ID"));
-                        txtHarga.setText(nf.format(d.getHargaJual()));
-                    } else {
-                        txtHarga.setText("");
-                    }
-                    
-                    // [FIX] Load tanggal ke JDateChooser
-                    String expDateStr = d.getTanggalExp();
-                    if (expDateStr != null && !expDateStr.trim().isEmpty()) {
-                        try {
-                            // Ubah String dari DB ("yyyy-MM-dd") kembali ke objek Date
-                            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                            Date parsedDate = sdf.parse(expDateStr);
-                            dateExpired.setDate(parsedDate);
-                        } catch (ParseException ex) {
-                            // Jika format di DB salah, biarkan kosong
-                            dateExpired.setDate(null);
-                        }
-                    } else {
-                        dateExpired.setDate(null);
-                    }
-                }
-            }
-
+            JOptionPane.showMessageDialog(this, "Perubahan disimpan.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
+            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            if (frame instanceof uiresponsive.Mainmenu) ((uiresponsive.Mainmenu) frame).showDataBarangPanel();
         } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Gagal memuat data:\n" + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Gagal menyimpan perubahan:\n" + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    private void clearFormFields() {
+    private void loadFromContext() {
+        Integer editingId = null;
+        try { editingId = BarangContext.editingId; } catch (Throwable t) { editingId = null; }
+        Integer editingDetailId = null;
+        try { editingDetailId = DetailContext.editingDetailId; } catch (Throwable t) { editingDetailId = null; }
+
+        clearFields();
+        selectedKategoriId = null;
+        selectedSupplierId = null;
+
+        if (editingId == null && editingDetailId == null) return;
+
+        if (barangDao == null || detailDao == null) {
+            JOptionPane.showMessageDialog(this, "DAO null", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        try {
+            Barang parent = null;
+            if (editingId != null) {
+                List<Barang> all = barangDao.findAll();
+                if (all != null) {
+                    for (Barang b: all) if (b.getId() == editingId) { parent = b; break; }
+                }
+            }
+
+            DetailBarang detail = null;
+            if (editingDetailId != null) {
+                detail = detailDao.findById(editingDetailId);
+                if (detail != null && parent == null) {
+                    List<Barang> all = barangDao.findAll();
+                    if (all != null) {
+                        for (Barang b: all) if (b.getId() == detail.getIdBarang()) { parent = b; break; }
+                    }
+                }
+            } else if (editingId != null) {
+                List<DetailBarang> dets = detailDao.findByBarangId(editingId);
+                if (dets != null && !dets.isEmpty()) detail = dets.get(0);
+            }
+
+            if (parent != null) {
+                txtKode.setText(String.valueOf(parent.getId()));
+                txtNama.setText(parent.getNama() == null ? "" : parent.getNama());
+                selectedKategoriId = parent.getIdKategori();
+                txtKategori.setText(parent.getNamaKategori() == null ? "" : parent.getNamaKategori());
+            }
+
+            if (detail != null) {
+                txtBarcode.setText(detail.getBarcode() == null ? "" : detail.getBarcode());
+                txtStok.setText(String.valueOf(detail.getStok()));
+                if (detail.getHargaJual() != null) {
+                    NumberFormat nf = NumberFormat.getInstance(new Locale("in","ID"));
+                    txtHarga.setText(nf.format(detail.getHargaJual()));
+                } else txtHarga.setText("");
+                if (detail.getTanggalExp() != null && !detail.getTanggalExp().trim().isEmpty()) {
+                    try { dateExpired.setDate(new SimpleDateFormat("yyyy-MM-dd").parse(detail.getTanggalExp())); } catch (ParseException ex) { dateExpired.setDate(null); }
+                } else dateExpired.setDate(null);
+
+                if (detail.getIdSupplier() != null) selectedSupplierId = String.valueOf(detail.getIdSupplier());
+                txtSupplier.setText(detail.getNamaSupplier() == null ? "" : detail.getNamaSupplier());
+            }
+
+            boolean perDetail = (editingDetailId != null);
+
+            // enable category & supplier only in per-detail
+            txtKategori.setEnabled(perDetail);
+            txtSupplier.setEnabled(perDetail);
+            txtKategori.setToolTipText(perDetail ? "Klik untuk pilih kategori" : "Kategori dapat diubah di mode per-detail");
+            txtSupplier.setToolTipText(perDetail ? "Klik untuk pilih supplier" : "Supplier dapat diubah di mode per-detail");
+
+            // detail fields enabled if there's a detail OR per-detail mode
+            boolean enableDetailFields = perDetail || (detail != null);
+            txtBarcode.setEnabled(enableDetailFields);
+            txtStok.setEnabled(enableDetailFields);
+            txtHarga.setEnabled(enableDetailFields);
+            dateExpired.setEnabled(enableDetailFields);
+
+            revalidate(); repaint();
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal load:\n" + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void clearFields() {
         txtKode.setText("");
-        txtNama.setText("");
-        txtKategori.setText("");
         txtBarcode.setText("");
         txtStok.setText("");
         txtHarga.setText("");
-        dateExpired.setDate(null); // [FIX] Ganti ini
+        dateExpired.setDate(null);
+        txtNama.setText("");
+        txtKategori.setText("");
+        txtSupplier.setText("");
+        txtKategori.setEnabled(false);
+        txtSupplier.setEnabled(false);
     }
 
-    // === Helper: membuat field (mengembalikan referensi field) ===
-    private RoundedTextField addField(JPanel panel, GridBagConstraints gbc, int gridx, String labelText) {
-        int row = gridx / 3;
-        int col = gridx % 3;
-
-        gbc.gridx = col;
-        gbc.gridy = row;
-
-        JPanel fieldPanel = new JPanel(new BorderLayout(5, 5));
-        fieldPanel.setOpaque(false);
-        JLabel label = new JLabel(labelText);
-        label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-
-        RoundedTextField field = new RoundedTextField(12);
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-
-        fieldPanel.add(label, BorderLayout.NORTH);
-        fieldPanel.add(field, BorderLayout.CENTER);
-        panel.add(fieldPanel, gbc);
-
-        return field;
-    }
-
-    // === Rounded TextField ===
+    // helper UI classes follow (RoundedTextField, RoundedButton)
     class RoundedTextField extends JTextField {
-        private int radius = 15;
-
+        private int radius = 12;
         public RoundedTextField(int size) {
             super(size);
             setOpaque(false);
-            setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
+            setBorder(BorderFactory.createEmptyBorder(6,10,6,10));
         }
-
-        @Override
-        protected void paintComponent(Graphics g) {
+        @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(Color.WHITE);
-            g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
-            g2.setColor(new Color(200, 200, 200));
-            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
+            g2.fillRoundRect(0,0,getWidth()-1,getHeight()-1,radius,radius);
+            g2.setColor(new Color(200,200,200));
+            g2.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius,radius);
             super.paintComponent(g);
             g2.dispose();
         }
     }
 
-    // === Rounded Button (smooth shadow & besar) ===
     class RoundedButton extends JButton {
-        private final Color backgroundColor;
-        private final Color textColor;
-        private int radius = 25;
-
-        public RoundedButton(String text, Color bg, Color fg) {
-            super(text);
-            this.backgroundColor = bg;
-            this.textColor = fg;
-            setFocusPainted(false);
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setFont(new Font("Segoe UI", Font.BOLD, 15));
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
+        private final Color bg; private final Color fg;
+        public RoundedButton(String txt, Color bg, Color fg) { super(txt); this.bg = bg; this.fg = fg; setOpaque(false); setFocusPainted(false); setBorderPainted(false); setFont(new Font("Segoe UI", Font.BOLD, 14)); }
+        @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            // Shadow halus (lebih smooth dan lembut)
-            for (int i = 0; i < 6; i++) {
-                g2.setColor(new Color(0, 0, 0, 10 - i)); // semakin redup di luar
-                g2.fillRoundRect(i, i + 2, getWidth() - i * 2, getHeight() - i * 2, radius, radius);
-            }
-
-            // Warna tombol
-            g2.setColor(backgroundColor);
-            g2.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, radius, radius);
-
-            // Teks tombol
-            g2.setColor(textColor);
+            g2.setColor(bg); g2.fillRoundRect(0,0,getWidth()-1,getHeight()-1,18,18);
+            g2.setColor(fg);
             FontMetrics fm = g2.getFontMetrics();
-            int textX = (getWidth() - fm.stringWidth(getText())) / 2;
-            int textY = (getHeight() + fm.getAscent()) / 2 - 3;
-            g2.drawString(getText(), textX, textY);
-
+            int x = (getWidth()-fm.stringWidth(getText()))/2;
+            int y = (getHeight()+fm.getAscent())/2-3;
+            g2.drawString(getText(), x, y);
             g2.dispose();
         }
     }
 
-    // PilihKategoriFrame membaca kategori dari DB (mirip tambahdatabarang)
-    class PilihKategoriFrame extends JFrame {
+    // PilihKategoriFrame & PilihSupplierFrame (sama implementasi seperti sebelumnya)
+    class PilihKategoriFrame extends JFrame { /* ... same as previous implementation ... */
+        // copy your existing implementations (loadKategoriIntoModel etc) here
+        // For brevity in this listing I'm omitting full body; keep your prior working code here.
         public PilihKategoriFrame(JTextField targetField) {
+            // paste earlier implementation (unchanged)
             setTitle("Pilih Kategori Barang");
-            setSize(600, 450);
+            setSize(600,450);
             setLocationRelativeTo(null);
-            setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
-            JPanel panel = new JPanel(new BorderLayout(10, 10));
-            panel.setBorder(new EmptyBorder(15, 15, 15, 15));
-            panel.setBackground(new Color(250, 250, 250));
+            JPanel panel = new JPanel(new BorderLayout(10,10));
+            panel.setBorder(new EmptyBorder(12,12,12,12));
+            panel.setBackground(new Color(250,250,250));
 
-            // Search bar
-            JPanel searchPanel = new JPanel(new BorderLayout(8, 8));
+            JPanel searchPanel = new JPanel(new BorderLayout(8,8));
             searchPanel.setOpaque(false);
             JTextField txtSearch = new JTextField();
             JButton btnSearch = new JButton("Cari");
-            styleButton(btnSearch, new Color(255, 140, 0));
+            styleBtn(btnSearch, new Color(255,140,0));
             searchPanel.add(new JLabel("Cari Kategori:"), BorderLayout.WEST);
             searchPanel.add(txtSearch, BorderLayout.CENTER);
             searchPanel.add(btnSearch, BorderLayout.EAST);
             panel.add(searchPanel, BorderLayout.NORTH);
 
-            // Tabel Kategori
-            String[] kolom = {"ID Kategori", "Nama Kategori"};
-            javax.swing.table.DefaultTableModel model = new javax.swing.table.DefaultTableModel(kolom, 0);
-            JTable tabel = new JTable(model);
-            tabel.setRowHeight(26);
-            tabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-            JScrollPane scroll = new JScrollPane(tabel);
-            panel.add(scroll, BorderLayout.CENTER);
+            String[] cols = {"ID Kategori","Nama Kategori"};
+            javax.swing.table.DefaultTableModel model = new javax.swing.table.DefaultTableModel(cols,0);
+            JTable t = new JTable(model);
+            t.setRowHeight(26);
+            t.setFont(new Font("Segoe UI", Font.PLAIN,13));
+            panel.add(new JScrollPane(t), BorderLayout.CENTER);
 
-            // load from DB
-            loadKategoriIntoModel(model, "");
+            loadKategori(model, "");
 
-            // Tombol bawah
-            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
-            btnPanel.setOpaque(false);
-            JButton btnPilih = new JButton("Pilih");
-            JButton btnCancel = new JButton("Cancel");
-            styleButton(btnPilih, new Color(0, 180, 0));
-            styleButton(btnCancel, new Color(220, 0, 0));
-            btnPanel.add(btnPilih);
-            btnPanel.add(btnCancel);
-            panel.add(btnPanel, BorderLayout.SOUTH);
+            JPanel btnP = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            btnP.setOpaque(false);
+            JButton pilih = new JButton("Pilih"), cancel = new JButton("Cancel");
+            styleBtn(pilih, new Color(0,180,0)); styleBtn(cancel, new Color(220,0,0));
+            btnP.add(pilih); btnP.add(cancel);
+            panel.add(btnP, BorderLayout.SOUTH);
 
-            // Aksi tombol
-            btnCancel.addActionListener(e -> dispose());
-            btnPilih.addActionListener(e -> {
-                int row = tabel.getSelectedRow();
-                if (row != -1) {
-                    String id = String.valueOf(tabel.getValueAt(row, 0));
-                    String nama = tabel.getValueAt(row, 1).toString();
-                    targetField.setText(nama); // isi otomatis ke textfield utama
-                    // set selectedKategoriId pada outer class
+            cancel.addActionListener(e -> dispose());
+            pilih.addActionListener(e -> {
+                int r = t.getSelectedRow();
+                if (r != -1) {
+                    String id = String.valueOf(t.getValueAt(r,0));
+                    String nama = String.valueOf(t.getValueAt(r,1));
+                    targetField.setText(nama);
                     selectedKategoriId = id;
                     dispose();
-                } else {
-                    JOptionPane.showMessageDialog(this, "Pilih dulu kategorinya!");
-                }
+                } else JOptionPane.showMessageDialog(this, "Pilih kategori dulu!");
             });
 
-            btnSearch.addActionListener(e -> {
-                String q = txtSearch.getText().trim();
-                loadKategoriIntoModel(model, q);
-            });
-
+            btnSearch.addActionListener(e -> loadKategori(model, txtSearch.getText().trim()));
             add(panel);
             setVisible(true);
         }
-
-        private void loadKategoriIntoModel(javax.swing.table.DefaultTableModel model, String q) {
+        private void loadKategori(javax.swing.table.DefaultTableModel model, String q) {
             model.setRowCount(0);
-            String sql;
-            if (q == null || q.isEmpty()) {
-                sql = "SELECT id_kategori, nama_kategori FROM data_kategori ORDER BY nama_kategori";
-            } else {
-                sql = "SELECT id_kategori, nama_kategori FROM data_kategori WHERE LOWER(nama_kategori) LIKE ? ORDER BY nama_kategori";
-            }
+            String sql = (q==null||q.isEmpty()) ? "SELECT id_kategori,nama_kategori FROM data_kategori ORDER BY nama_kategori"
+                    : "SELECT id_kategori,nama_kategori FROM data_kategori WHERE LOWER(nama_kategori) LIKE ? ORDER BY nama_kategori";
             try (Connection conn = DatabaseHelper.getConnection();
                  PreparedStatement ps = conn.prepareStatement(sql)) {
-                if (q != null && !q.isEmpty()) ps.setString(1, "%" + q.toLowerCase() + "%");
+                if (q!=null && !q.isEmpty()) ps.setString(1, "%" + q.toLowerCase() + "%");
                 try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        model.addRow(new Object[]{ rs.getString("id_kategori"), rs.getString("nama_kategori") });
-                    }
+                    while (rs.next()) model.addRow(new Object[]{ rs.getString("id_kategori"), rs.getString("nama_kategori") });
                 }
             } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this, "Gagal memuat kategori:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Gagal memuat kategori:\n"+ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
-
-        private void styleButton(JButton btn, Color color) {
-            btn.setBackground(color);
-            btn.setForeground(Color.WHITE);
-            btn.setFont(new Font("Segoe UI Semibold", Font.BOLD, 14));
-            btn.setFocusPainted(false);
-            btn.setPreferredSize(new Dimension(120, 40));
-        }
+        private void styleBtn(JButton b, Color c){ b.setBackground(c); b.setForeground(Color.WHITE); b.setFocusPainted(false); b.setPreferredSize(new Dimension(110,36)); b.setFont(new Font("Segoe UI", Font.BOLD, 13)); }
     }
 
-    // ====== utility ======
-    // membersihkan string harga "1.234.567" atau "1.234.567,89" -> "1234567" atau "1234567.89"
+    class PilihSupplierFrame extends JFrame {
+        public PilihSupplierFrame(JTextField targetField) {
+            setTitle("Pilih Supplier");
+            setSize(600,450);
+            setLocationRelativeTo(null);
+            setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+
+            JPanel panel = new JPanel(new BorderLayout(10,10));
+            panel.setBorder(new EmptyBorder(12,12,12,12));
+            panel.setBackground(new Color(250,250,250));
+
+            JPanel searchPanel = new JPanel(new BorderLayout(8,8));
+            searchPanel.setOpaque(false);
+            JTextField txtSearch = new JTextField();
+            JButton btnSearch = new JButton("Cari");
+            styleBtn(btnSearch, new Color(255,140,0));
+            searchPanel.add(new JLabel("Cari Supplier:"), BorderLayout.WEST);
+            searchPanel.add(txtSearch, BorderLayout.CENTER);
+            searchPanel.add(btnSearch, BorderLayout.EAST);
+            panel.add(searchPanel, BorderLayout.NORTH);
+
+            String[] cols = {"ID Supplier","Nama Supplier"};
+            javax.swing.table.DefaultTableModel model = new javax.swing.table.DefaultTableModel(cols,0);
+            JTable t = new JTable(model);
+            t.setRowHeight(26);
+            t.setFont(new Font("Segoe UI", Font.PLAIN,13));
+            panel.add(new JScrollPane(t), BorderLayout.CENTER);
+
+            loadSupplier(model, "");
+
+            JPanel btnP = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            btnP.setOpaque(false);
+            JButton pilih = new JButton("Pilih"), cancel = new JButton("Cancel");
+            styleBtn(pilih, new Color(0,180,0)); styleBtn(cancel, new Color(220,0,0));
+            btnP.add(pilih); btnP.add(cancel);
+            panel.add(btnP, BorderLayout.SOUTH);
+
+            cancel.addActionListener(e -> dispose());
+            pilih.addActionListener(e -> {
+                int r = t.getSelectedRow();
+                if (r != -1) {
+                    String id = String.valueOf(t.getValueAt(r,0));
+                    String nama = String.valueOf(t.getValueAt(r,1));
+                    targetField.setText(nama);
+                    selectedSupplierId = id;
+                    dispose();
+                } else JOptionPane.showMessageDialog(this, "Pilih supplier dulu!");
+            });
+
+            btnSearch.addActionListener(e -> loadSupplier(model, txtSearch.getText().trim()));
+            add(panel);
+            setVisible(true);
+        }
+        private void loadSupplier(javax.swing.table.DefaultTableModel model, String q) {
+            model.setRowCount(0);
+            String sql = (q==null||q.isEmpty()) ? "SELECT id_supplier,nama_supplier FROM data_supplier ORDER BY nama_supplier"
+                    : "SELECT id_supplier,nama_supplier FROM data_supplier WHERE LOWER(nama_supplier) LIKE ? ORDER BY nama_supplier";
+            try (Connection conn = DatabaseHelper.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                if (q!=null && !q.isEmpty()) ps.setString(1, "%" + q.toLowerCase() + "%");
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) model.addRow(new Object[]{ rs.getString("id_supplier"), rs.getString("nama_supplier") });
+                }
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this, "Gagal memuat supplier:\n"+ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+        private void styleBtn(JButton b, Color c){ b.setBackground(c); b.setForeground(Color.WHITE); b.setFocusPainted(false); b.setPreferredSize(new Dimension(110,36)); b.setFont(new Font("Segoe UI", Font.BOLD, 13)); }
+    }
+
+    // utility
     private String cleanNumberString(String s) {
         if (s == null) return "0";
         s = s.trim();
-        // hapus semua karakter kecuali digit, '.' dan ','
         String keep = s.replaceAll("[^0-9\\.,]", "");
-        // jika ada titik sebagai thousand sep dan koma sebagai decimal: ubah titik kosong dan ganti koma -> dot
-        // heuristik: jika ada ',' maka treat ',' sebagai decimal separator
-        if (keep.contains(",")) {
-            keep = keep.replaceAll("\\.", ""); // hapus thousand sep
-            keep = keep.replace(',', '.');
-        } else {
-            // tidak ada koma -> hapus titik sebagai thousand sep
-            keep = keep.replaceAll("\\.", "");
-        }
+        if (keep.contains(",")) { keep = keep.replaceAll("\\.", ""); keep = keep.replace(',', '.'); }
+        else keep = keep.replaceAll("\\.", "");
         if (keep.isEmpty()) return "0";
         return keep;
     }
 
-    // Cari id_kategori dari nama kategori di DB (dipakai saat saving jika selectedKategoriId null)
     private String getKategoriIdByName(String name) {
         if (name == null || name.trim().isEmpty()) return null;
         String id = null;
@@ -555,14 +559,20 @@ public class editdatabarang extends JPanel {
         try (Connection conn = DatabaseHelper.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, name);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) id = rs.getString("id_kategori");
-            }
-        } catch (SQLException ex) {
-            // ignore, return null
-        }
+            try (ResultSet rs = ps.executeQuery()) { if (rs.next()) id = rs.getString("id_kategori"); }
+        } catch (SQLException ex) {}
         return id;
     }
 
-    
+    private String getSupplierIdByName(String name) {
+        if (name == null || name.trim().isEmpty()) return null;
+        String id = null;
+        String sql = "SELECT id_supplier FROM data_supplier WHERE nama_supplier = ? LIMIT 1";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, name);
+            try (ResultSet rs = ps.executeQuery()) { if (rs.next()) id = rs.getString("id_supplier"); }
+        } catch (SQLException ex) {}
+        return id;
+    }
 }

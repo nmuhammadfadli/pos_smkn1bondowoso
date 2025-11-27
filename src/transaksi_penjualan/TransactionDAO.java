@@ -210,33 +210,45 @@ public class TransactionDAO {
     /**
      * Ambil detail item berdasarkan id_transaksi
      */
-    public List<TransactionItem> findItemsByTransaction(long idTransaksi) throws SQLException {
-        List<TransactionItem> items = new ArrayList<>();
-        String sql = "SELECT d.id_detail_penjualan, d.id_detail_barang, b.nama, " +
-                "d.jumlah_barang, d.harga_unit, d.subtotal " +
-                "FROM detail_penjualan d " +
-                "LEFT JOIN detail_barang db ON d.id_detail_barang = db.id_detail_barang " +
-                "LEFT JOIN barang b ON db.id_barang = b.id " +
-                "WHERE d.id_transaksi = ?";
+  // transaksi_penjualan/TransactionDAO.java
+public List<TransactionItem> findItemsByTransaction(long idTransaksi) throws SQLException {
+    List<TransactionItem> result = new ArrayList<>();
+    String sql =
+        "SELECT dp.id_detail_penjualan, dp.id_detail_barang, dp.jumlah_barang, dp.harga_unit, dp.subtotal, " +
+        "       db.id_detail_pembelian, b.nama AS nama_barang, p.harga_beli " +
+        "FROM detail_penjualan dp " +
+        "LEFT JOIN detail_barang db ON dp.id_detail_barang = db.id_detail_barang " +
+        "LEFT JOIN barang b ON db.id_barang = b.id " +
+        "LEFT JOIN detail_pembelian p ON db.id_detail_pembelian = p.id_detail_pembelian " +
+        "WHERE dp.id_transaksi = ?";
 
-        try (Connection conn = DatabaseHelper.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, idTransaksi);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    TransactionItem it = new TransactionItem();
-                    it.setIdDetailPenjualan(rs.getInt("id_detail_penjualan"));
-                    it.setIdDetailBarang(rs.getInt("id_detail_barang"));
-                    it.setNamaBarang(rs.getString("nama"));
-                    it.setJumlahBarang(rs.getInt("jumlah_barang"));
-                    String harga = rs.getString("harga_unit");
-                    String sub = rs.getString("subtotal");
-                    it.setHargaUnit(harga == null ? BigDecimal.ZERO : new BigDecimal(harga));
-                    it.setSubtotal(sub == null ? BigDecimal.ZERO : new BigDecimal(sub));
-                    items.add(it);
-                }
+    try (Connection conn = DatabaseHelper.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setLong(1, idTransaksi);
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                TransactionItem it = new TransactionItem();
+                it.setIdDetailPenjualan(rs.getInt("id_detail_penjualan"));
+                it.setIdDetailBarang(rs.getInt("id_detail_barang"));
+                it.setNamaBarang(rs.getString("nama_barang"));
+                it.setJumlahBarang(rs.getInt("jumlah_barang"));
+
+                // parsing BigDecimal aman
+                it.setHargaUnit(parseBigDecimalSafe(rs.getString("harga_unit")));
+                it.setSubtotal(parseBigDecimalSafe(rs.getString("subtotal")));
+                it.setHargaBeli(parseBigDecimalSafe(rs.getString("harga_beli"))); // bisa null -> ZERO
+
+                result.add(it);
             }
         }
-        return items;
     }
+    return result;
+}
+
+private static BigDecimal parseBigDecimalSafe(String s) {
+    if (s == null) return BigDecimal.ZERO;
+    s = s.trim();
+    if (s.isEmpty()) return BigDecimal.ZERO;
+    try { return new BigDecimal(s); } catch (Exception ex) { return BigDecimal.ZERO; }
+}
 }

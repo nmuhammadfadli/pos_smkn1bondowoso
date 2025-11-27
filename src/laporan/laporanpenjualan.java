@@ -36,7 +36,7 @@ public class laporanpenjualan extends JPanel {
     private JLabel lblTotalPendapatanValue;
     private JLabel lblJumlahTransaksiValue;
     private JLabel lblBarangTerjualValue;
-    private JLabel lblRataRataValue;
+    private JLabel lblLabaValue;
 
     public laporanpenjualan() {
         setLayout(new BorderLayout());
@@ -120,8 +120,8 @@ public class laporanpenjualan extends JPanel {
         JPanel pBarang = createSummaryPanelWithLabel("Barang Terjual", "0", new Color(244, 67, 54));
         lblBarangTerjualValue = findValueLabelInSummary(pBarang);
 
-        JPanel pRata = createSummaryPanelWithLabel("Rata-rata Transaksi", "Rp " + moneyFmt.format(0), new Color(255, 167, 38));
-        lblRataRataValue = findValueLabelInSummary(pRata);
+        JPanel pLaba = createSummaryPanelWithLabel("Laba Transaksi", "Rp " + moneyFmt.format(0), new Color(255, 167, 38));
+        lblLabaValue = findValueLabelInSummary(pLaba);
 
         right.add(pTotal);
         right.add(Box.createVerticalStrut(15));
@@ -129,7 +129,7 @@ public class laporanpenjualan extends JPanel {
         right.add(Box.createVerticalStrut(15));
         right.add(pBarang);
         right.add(Box.createVerticalStrut(15));
-        right.add(pRata);
+        right.add(pLaba); // gunakan panel baru
         right.add(Box.createVerticalStrut(15));
 
         main.add(left, BorderLayout.CENTER);
@@ -231,32 +231,48 @@ public class laporanpenjualan extends JPanel {
     }
 
     // summary calculation (uses findItemsByTransaction to count sold quantities)
-    private void updateSummary(List<TransactionRecord> transactions) {
-        try {
-            BigDecimal totalPendapatan = BigDecimal.ZERO;
-            int jumlahTrans = transactions.size();
-            long totalBarangTerjual = 0;
+ // summary calculation (uses findItemsByTransaction to count sold quantities)
+private void updateSummary(List<TransactionRecord> transactions) {
+    try {
+        BigDecimal totalPendapatan = BigDecimal.ZERO;
+        BigDecimal totalLaba = BigDecimal.ZERO; // <-- total laba semua transaksi
+        int jumlahTrans = transactions.size();
+        long totalBarangTerjual = 0;
 
-            for (TransactionRecord tr : transactions) {
-                if (tr.getTotalHarga() != null) totalPendapatan = totalPendapatan.add(tr.getTotalHarga());
-                try {
-                    List<TransactionItem> items = txDao.findItemsByTransaction(tr.getIdTransaksi());
-                    for (TransactionItem it : items) totalBarangTerjual += it.getJumlahBarang();
-                } catch (Exception ignore) { }
-            }
+        for (TransactionRecord tr : transactions) {
+            if (tr.getTotalHarga() != null) totalPendapatan = totalPendapatan.add(tr.getTotalHarga());
+            try {
+                List<TransactionItem> items = txDao.findItemsByTransaction(tr.getIdTransaksi());
+                for (TransactionItem it : items) {
+                    // jumlah terjual
+                    totalBarangTerjual += it.getJumlahBarang();
 
-            lblTotalPendapatanValue.setText("Rp " + moneyFmt.format(totalPendapatan));
-            lblJumlahTransaksiValue.setText(String.valueOf(jumlahTrans));
-            lblBarangTerjualValue.setText(String.valueOf(totalBarangTerjual));
-            if (jumlahTrans == 0) lblRataRataValue.setText("Rp 0");
-            else lblRataRataValue.setText("Rp " + moneyFmt.format(totalPendapatan.divide(BigDecimal.valueOf(jumlahTrans), java.math.RoundingMode.HALF_UP).longValue())); // Ditambahkan RoundingMode
-        } catch (Exception ex) {
-            lblTotalPendapatanValue.setText("Rp 0");
-            lblJumlahTransaksiValue.setText("0");
-            lblBarangTerjualValue.setText("0");
-            lblRataRataValue.setText("Rp 0");
+                    // ambil harga jual dan harga beli (fallback ke ZERO jika null)
+                    BigDecimal hargaUnit = it.getHargaUnit() == null ? BigDecimal.ZERO : it.getHargaUnit();
+                    BigDecimal hargaBeli = it.getHargaBeli() == null ? BigDecimal.ZERO : it.getHargaBeli();
+
+                    // laba per item = (hargaUnit - hargaBeli) * qty
+                    BigDecimal qty = BigDecimal.valueOf(it.getJumlahBarang());
+                    BigDecimal labaPerItem = hargaUnit.subtract(hargaBeli).multiply(qty);
+
+                    totalLaba = totalLaba.add(labaPerItem);
+                }
+            } catch (Exception ignore) { }
         }
+
+        lblTotalPendapatanValue.setText("Rp " + moneyFmt.format(totalPendapatan.longValue()));
+        lblJumlahTransaksiValue.setText(String.valueOf(jumlahTrans));
+        lblBarangTerjualValue.setText(String.valueOf(totalBarangTerjual));
+        lblLabaValue.setText("Rp " + moneyFmt.format(totalLaba.longValue()));
+
+    } catch (Exception ex) {
+        lblTotalPendapatanValue.setText("Rp 0");
+        lblJumlahTransaksiValue.setText("0");
+        lblBarangTerjualValue.setText("0");
+        lblLabaValue.setText("Rp 0");
     }
+}
+
 
     // Show modal dialog listing items for given transaction id
     private void showTransactionItemsDialog(long idTransaksi) {
@@ -266,7 +282,7 @@ public class laporanpenjualan extends JPanel {
                     "Detail Barang - Transaksi " + idTransaksi, Dialog.ModalityType.APPLICATION_MODAL);
             dlg.setLayout(new BorderLayout(8,8));
 
-            String[] cols = {"ID Detail","ID Barang","Nama Barang","Qty","Harga Unit","Subtotal"};
+           String[] cols = {"ID Detail","ID Barang","Nama Barang","Qty","Harga Unit","Harga Beli","Subtotal"};
             DefaultTableModel m = new DefaultTableModel(cols, 0) {
                 @Override public boolean isCellEditable(int r,int c){ return false; }
             };
@@ -275,16 +291,18 @@ public class laporanpenjualan extends JPanel {
             t.getTableHeader().setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
             t.setFont(new Font("Segoe UI", Font.PLAIN, 13));
             for (TransactionItem it : items) {
-                String harga = it.getHargaUnit() == null ? "0" : it.getHargaUnit().toPlainString();
-                String sub = it.getSubtotal() == null ? "0" : it.getSubtotal().toPlainString();
-                m.addRow(new Object[]{
-                        it.getIdDetailPenjualan(),
-                        it.getIdDetailBarang(),
-                        it.getNamaBarang(),
-                        it.getJumlahBarang(),
-                        harga,
-                        sub
-                });
+              String harga = it.getHargaUnit() == null ? "0" : it.getHargaUnit().toPlainString();
+            String hargaBeli = it.getHargaBeli() == null ? "0" : it.getHargaBeli().toPlainString();
+            String sub = it.getSubtotal() == null ? "0" : it.getSubtotal().toPlainString();
+            m.addRow(new Object[]{
+                it.getIdDetailPenjualan(),
+                it.getIdDetailBarang(),
+                it.getNamaBarang(),
+                it.getJumlahBarang(),
+                harga,
+                hargaBeli,
+                sub
+            });
             }
             // hide id detail col visually
             t.getColumnModel().getColumn(0).setMinWidth(0);

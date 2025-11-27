@@ -3,24 +3,21 @@ package page;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.geom.Ellipse2D; // [BARU] Untuk style titik chart
+import java.awt.geom.Ellipse2D;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
-import java.text.SimpleDateFormat; // [BARU] Untuk format tanggal di chart
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
-// [BARU] Import JFreeChart
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -32,9 +29,7 @@ import org.jfree.data.time.Day;
 import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
 import org.jfree.data.xy.XYDataset;
-// [AKHIR BARU]
 
-// Import DAO dan model dari package lain
 import laporan.laporanpenjualan;
 import pengguna.Pengguna;
 import transaksi_penjualan.TransactionDAO;
@@ -56,12 +51,13 @@ public class dashboard extends JPanel {
     private JLabel lblJumlahTransaksiValue;
     private JLabel lblBarangTerjualValue;
     private JLabel lblTotalPembelianValue;
+    private JLabel lblLabaValue;
 
     // Referensi untuk kartu produk terlaris
     private JPanel topProductContentPanel;
     private JLabel topProductPlaceholder;
 
-    // [BARU] Referensi untuk panel konten kartu grafik
+    // Referensi untuk panel konten kartu grafik
     private JPanel chartCardContentPanel;
 
     // Formatter tanggal
@@ -93,9 +89,7 @@ public class dashboard extends JPanel {
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.BOTH;
 
-        // =======================
-        // ROW 0 - KARTU SELAMAT DATANG
-        // =======================
+        // ROW 0 - welcome
         gbc.gridy = 0;
         gbc.gridx = 0;
         gbc.gridwidth = 4;
@@ -103,32 +97,30 @@ public class dashboard extends JPanel {
         gbc.weighty = 0.0;
         add(createWelcomeCard(), gbc);
 
-        // =======================
-        // ROW 1 - 4 KARTU STATISTIK
-        // =======================
+        // ROW 1 - 4 cards
         gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.weightx = 0.25;
         gbc.weighty = 0.0;
-        gbc.insets = new Insets(10, 10, 10, 10); // (top, left, bottom, right)
+        gbc.insets = new Insets(10, 10, 10, 10);
 
-        // Kartu 1: Total Penjualan
+        // Card 1
         gbc.gridx = 0;
         RoundedPanel cardPenjualan = createTopCard(
-                "Penjualan Hari Ini", "Memuat...",
+                "Penjualan", "Memuat...",
                 "/Icon/totalpenjualan.png", new Color(0, 150, 136));
         lblTotalPenjualanValue = findValueLabelInCard(cardPenjualan);
         add(cardPenjualan, gbc);
 
-        // Kartu 2: Jumlah Transaksi
+        // Card 2
         gbc.gridx = 1;
         RoundedPanel cardTransaksi = createTopCard(
-                "Transaksi Hari Ini", "Memuat...",
+                "Transaksi", "Memuat...",
                 "/Icon/totaltransaksi.png", new Color(33, 150, 243));
         lblJumlahTransaksiValue = findValueLabelInCard(cardTransaksi);
         add(cardTransaksi, gbc);
 
-        // Kartu 3: Barang Terjual
+        // Card 3
         gbc.gridx = 2;
         RoundedPanel cardBarang = createTopCard(
                 "Barang Terjual", "Memuat...",
@@ -136,32 +128,42 @@ public class dashboard extends JPanel {
         lblBarangTerjualValue = findValueLabelInCard(cardBarang);
         add(cardBarang, gbc);
 
-        // Kartu 4: Total Pembelian
+        // Card 4: Pembelian + Laba (komposit)
         gbc.gridx = 3;
         RoundedPanel cardPembelian = createTopCard(
-                "Pembelian Hari Ini", "Memuat...",
+                "Pembelian", "Memuat...",
                 "/Icon/totalpembelian.png", new Color(244, 67, 54));
         lblTotalPembelianValue = findValueLabelInCard(cardPembelian);
-        add(cardPembelian, gbc);
 
-        // =======================
-        // [DIUBAH] ROW 2 - KARTU GRAFIK & PRODUK TERLARIS
-        // =======================
+        RoundedPanel labaCard = createSmallCard(
+                "Laba", "Rp 0",
+                "/Icon/laba.png", new Color(76, 175, 80));
+        lblLabaValue = findValueLabelInCard(labaCard);
+
+        JPanel composite = new JPanel(new BorderLayout(10, 0));
+        composite.setOpaque(false);
+        composite.add(cardPembelian, BorderLayout.CENTER);
+        JPanel eastHolder = new JPanel(new BorderLayout());
+        eastHolder.setOpaque(false);
+        eastHolder.add(labaCard, BorderLayout.CENTER);
+        composite.add(eastHolder, BorderLayout.EAST);
+
+        add(composite, gbc);
+
+        // ROW 2 - chart (3) + top products (1)
         gbc.gridy = 2;
         gbc.weightx = 1.0;
-        gbc.weighty = 1.0; // Baris ini akan mengisi sisa ruang vertikal
+        gbc.weighty = 1.0;
 
-        // Kartu Grafik (lebar 3)
         gbc.gridx = 0;
         gbc.gridwidth = 3;
-        add(createMainChartCard(), gbc); // [DIUBAH] Panel ini sekarang berisi placeholder
+        add(createMainChartCard(), gbc);
 
-        // Kartu Produk Terlaris (lebar 1)
         gbc.gridx = 3;
         gbc.gridwidth = 1;
-        add(createTopProductCard(), gbc); // Mengganti createActivityCard()
+        add(createTopProductCard(), gbc);
 
-        // Mulai ambil data di background
+        // Load data
         loadDashboardData();
     }
 
@@ -169,89 +171,94 @@ public class dashboard extends JPanel {
      * Mengambil data di background thread agar UI tidak freeze.
      */
     public void loadDashboardData() {
-        // Teks awal
+        // default teks
         lblTotalPenjualanValue.setText("Rp 0");
         lblJumlahTransaksiValue.setText("0 Transaksi");
         lblBarangTerjualValue.setText("0 Item");
         lblTotalPembelianValue.setText("Rp 0");
+        lblLabaValue.setText("Rp 0");
 
-        // SwingWorker untuk proses background
         SwingWorker<DashboardData, Void> worker = new SwingWorker<DashboardData, Void>() {
-
             @Override
             protected DashboardData doInBackground() throws Exception {
                 LocalDate today = LocalDate.now();
-                // [BARU] Tentukan rentang 30 hari
-                LocalDate thirtyDaysAgo = today.minusDays(29); // 29 hari lalu + hari ini = 30 hari
+                LocalDate thirtyDaysAgo = today.minusDays(29);
                 DashboardData data = new DashboardData();
-                
-                // Map untuk menghitung produk
+
                 Map<String, Long> productTally = new HashMap<>();
-                // [BARU] Map untuk data chart
                 Map<LocalDate, BigDecimal> salesPerDay = new HashMap<>();
 
-                // 1. Hitung Data Penjualan (dari laporanpenjualan)
+                // 1. Penjualan
                 try {
                     List<TransactionRecord> list = txDao.findAllTransactions();
                     for (TransactionRecord tr : list) {
                         LocalDate tgl = parseDateSafe(tr.getTglTransaksi());
                         if (tgl == null || tr.getTotalHarga() == null) continue;
-                        
-                        // Cek untuk 4 kartu statistik (HARI INI)
+
                         if (tgl.equals(today)) {
-                            data.totalPenjualan = data.totalPenjualan.add(tr.getTotalHarga());
+                            data.totalPenjualan = safeAdd(data.totalPenjualan, tr.getTotalHarga());
                             data.jumlahTransaksi++;
 
-                            // Hitung barang terjual & tally produk
                             List<TransactionItem> items = txDao.findItemsByTransaction(tr.getIdTransaksi());
                             for (TransactionItem it : items) {
                                 long qty = it.getJumlahBarang();
                                 data.barangTerjual += qty;
-                                
+
                                 String productName = it.getNamaBarang();
-                                if(productName != null) {
+                                if (productName != null) {
                                     productTally.put(productName, productTally.getOrDefault(productName, 0L) + qty);
                                 }
+
+                                // Perhitungan laba: (harga_jual - harga_beli) * qty
+                                BigDecimal hargaUnit = (it.getHargaUnit() == null) ? BigDecimal.ZERO : it.getHargaUnit();
+                                BigDecimal hargaBeli;
+                                try {
+                                    hargaBeli = it.getHargaBeli();
+                                    if (hargaBeli == null) hargaBeli = BigDecimal.ZERO;
+                                } catch (Throwable ignore) {
+                                    hargaBeli = BigDecimal.ZERO;
+                                }
+
+                                BigDecimal qtyBd = BigDecimal.valueOf(qty);
+                                BigDecimal labaPerItem = hargaUnit.subtract(hargaBeli).multiply(qtyBd);
+                                data.totalLaba = data.totalLaba.add(labaPerItem);
                             }
                         }
-                        
-                        // [BARU] Cek untuk data grafik (30 HARI TERAKHIR)
+
+                        // sales per day (30 hari)
                         if (!tgl.isBefore(thirtyDaysAgo) && !tgl.isAfter(today)) {
                             BigDecimal currentSales = salesPerDay.getOrDefault(tgl, BigDecimal.ZERO);
-                            salesPerDay.put(tgl, currentSales.add(tr.getTotalHarga()));
+                            currentSales = safeAdd(currentSales, tr.getTotalHarga());
+                            salesPerDay.put(tgl, currentSales);
                         }
                     }
                 } catch (Exception e) {
                     System.err.println("Gagal hitung penjualan: " + e.getMessage());
                 }
 
-                // [BARU] Konversi Map salesPerDay ke XYDataset (TimeSeries)
+                // Build time series 30 hari
                 TimeSeries salesSeries = new TimeSeries("Penjualan");
-                for (int i = 29; i >= 0; i--) { // Loop 30 hari (dari 29 hari lalu s/d hari ini)
+                for (int i = 29; i >= 0; i--) {
                     LocalDate date = today.minusDays(i);
                     BigDecimal total = salesPerDay.getOrDefault(date, BigDecimal.ZERO);
-                    // Gunakan org.jfree.data.time.Day untuk sumbu tanggal
                     salesSeries.add(new Day(date.getDayOfMonth(), date.getMonthValue(), date.getYear()), total);
                 }
                 data.salesChartDataset = new TimeSeriesCollection(salesSeries);
 
-
-                // Konversi Map produk ke List dan urutkan
+                // Top products
                 for (Map.Entry<String, Long> entry : productTally.entrySet()) {
                     data.topProducts.add(new ProductSummary(entry.getKey(), entry.getValue()));
                 }
                 data.topProducts.sort((p1, p2) -> Long.compare(p2.quantity, p1.quantity));
 
-
-                // 2. Hitung Data Pembelian (dari laporanpembelian)
+                // 2. Pembelian hari ini
                 try {
                     List<Pembelian> purchases = pDao.findAllPembelian();
                     for (Pembelian p : purchases) {
                         LocalDate tgl = parseDateSafe(p.getTglPembelian());
                         if (tgl != null && tgl.equals(today)) {
-                            if (p.getTotalHarga() != null) {
-                                data.totalPembelian += p.getTotalHarga();
-                            }
+                            // gunakan helper safeAdd agar tipe p.getTotalHarga() fleksibel
+                            data.totalPembelian = safeAdd(data.totalPembelian, p.getTotalHarga());
                         }
                     }
                 } catch (Exception e) {
@@ -264,35 +271,33 @@ public class dashboard extends JPanel {
             @Override
             protected void done() {
                 try {
-                    // Update UI di Event Dispatch Thread
                     DashboardData data = get();
                     lblTotalPenjualanValue.setText("Rp " + moneyFmt.format(data.totalPenjualan));
                     lblJumlahTransaksiValue.setText(data.jumlahTransaksi + " Transaksi");
                     lblBarangTerjualValue.setText(data.barangTerjual + " Item");
                     lblTotalPembelianValue.setText("Rp " + moneyFmt.format(data.totalPembelian));
-                    
-                    // Update kartu produk terlaris
+                    lblLabaValue.setText("Rp " + moneyFmt.format(data.totalLaba));
+
                     populateTopProductCard(data.topProducts);
-                    
-                    // [BARU] Update kartu grafik
+
                     if (data.salesChartDataset != null) {
                         JFreeChart lineChart = createLineChart(data.salesChartDataset);
                         ChartPanel chartPanel = new ChartPanel(lineChart);
-                        chartPanel.setMouseWheelEnabled(true); // Aktifkan zoom
+                        chartPanel.setMouseWheelEnabled(true);
                         chartPanel.setOpaque(false);
-                        
-                        chartCardContentPanel.removeAll(); // Hapus placeholder
+
+                        chartCardContentPanel.removeAll();
                         chartCardContentPanel.add(chartPanel, BorderLayout.CENTER);
                         chartCardContentPanel.revalidate();
                         chartCardContentPanel.repaint();
                     }
-                    
                 } catch (Exception e) {
                     e.printStackTrace();
                     lblTotalPenjualanValue.setText("Error");
                     lblJumlahTransaksiValue.setText("Error");
                     lblBarangTerjualValue.setText("Error");
                     lblTotalPembelianValue.setText("Error");
+                    lblLabaValue.setText("Error");
                 }
             }
         };
@@ -311,27 +316,48 @@ public class dashboard extends JPanel {
         }
     }
 
-    // Helper untuk menyimpan data dari background thread
+    // Helper yang fleksibel untuk menambahkan nilai ke BigDecimal
+    private static BigDecimal safeAdd(BigDecimal base, Object value) {
+        if (base == null) base = BigDecimal.ZERO;
+        if (value == null) return base;
+        try {
+            if (value instanceof BigDecimal) {
+                return base.add((BigDecimal) value);
+            } else if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
+                return base.add(BigDecimal.valueOf(((Number) value).longValue()));
+            } else if (value instanceof Double || value instanceof Float) {
+                return base.add(BigDecimal.valueOf(((Number) value).doubleValue()));
+            } else if (value instanceof Number) {
+                // general Number fallback
+                return base.add(BigDecimal.valueOf(((Number) value).doubleValue()));
+            } else {
+                // coba parse string
+                return base.add(new BigDecimal(value.toString()));
+            }
+        } catch (Throwable t) {
+            // jika gagal parsing, abaikan penambahan
+            return base;
+        }
+    }
+
+    // Helper class to hold data from background
     private class DashboardData {
         BigDecimal totalPenjualan = BigDecimal.ZERO;
         int jumlahTransaksi = 0;
         long barangTerjual = 0;
-        long totalPembelian = 0;
+        BigDecimal totalPembelian = BigDecimal.ZERO;
+        BigDecimal totalLaba = BigDecimal.ZERO;
         List<ProductSummary> topProducts = new ArrayList<>();
-        // [BARU] Field untuk menyimpan dataset chart
         XYDataset salesChartDataset;
     }
 
-    // ====== FUNGSI PEMBUAT KARTU ======
+    // ======= UI helper / card creators (tidak terlalu diubah dari versimu) =======
 
-    /**
-     * Membuat kartu statistik dengan ikon. (Padding sudah diperbaiki)
-     */
     private RoundedPanel createTopCard(String title, String initialValue, String iconName, Color bgColor) {
         RoundedPanel card = new RoundedPanel(20, bgColor);
-        card.setLayout(new BorderLayout(25, 0)); // Jarak horizontal ikon & teks
+        card.setLayout(new BorderLayout(25, 0));
         card.setPreferredSize(new Dimension(220, 150));
-        card.setBorder(new EmptyBorder(20, 25, 20, 25)); // Padding keliling
+        card.setBorder(new EmptyBorder(20, 25, 20, 25));
         card.setShadowVisible(true);
         card.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
@@ -368,20 +394,61 @@ public class dashboard extends JPanel {
 
         card.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseEntered(MouseEvent e) {
-                card.setHovered(true);
-            }
+            public void mouseEntered(MouseEvent e) { card.setHovered(true); }
             @Override
-            public void mouseExited(MouseEvent e) {
-                card.setHovered(false);
-            }
+            public void mouseExited(MouseEvent e) { card.setHovered(false); }
         });
         return card;
     }
 
-    /**
-     * Helper untuk mencari JLabel value di dalam kartu.
-     */
+    private RoundedPanel createSmallCard(String title, String initialValue, String iconName, Color bgColor) {
+        RoundedPanel card = new RoundedPanel(16, bgColor);
+        card.setLayout(new BorderLayout(10, 0));
+        card.setPreferredSize(new Dimension(160, 150));
+        card.setBorder(new EmptyBorder(16, 16, 16, 16));
+        card.setShadowVisible(true);
+        card.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        JPanel textPanel = new JPanel(new GridLayout(2, 1));
+        textPanel.setOpaque(false);
+
+        JLabel lblTitle = new JLabel(title);
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        lblTitle.setForeground(Color.WHITE);
+
+        JLabel lblValue = new JLabel(initialValue);
+        lblValue.setFont(new Font("Segoe UI Semibold", Font.BOLD, 18));
+        lblValue.setForeground(Color.WHITE);
+        lblValue.setName("valueLabel");
+
+        textPanel.add(lblTitle);
+        textPanel.add(lblValue);
+
+        JLabel lblIcon = new JLabel();
+        try {
+            ImageIcon icon = new ImageIcon(getClass().getResource(iconName));
+            Image img = icon.getImage().getScaledInstance(36, 36, Image.SCALE_SMOOTH);
+            lblIcon.setIcon(new ImageIcon(img));
+        } catch (Exception e) {
+            lblIcon.setText("₿");
+            lblIcon.setFont(new Font("Arial", Font.BOLD, 24));
+            lblIcon.setForeground(Color.WHITE);
+        }
+        lblIcon.setHorizontalAlignment(SwingConstants.CENTER);
+        lblIcon.setVerticalAlignment(SwingConstants.CENTER);
+
+        card.add(lblIcon, BorderLayout.WEST);
+        card.add(textPanel, BorderLayout.CENTER);
+
+        card.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) { card.setHovered(true); }
+            @Override
+            public void mouseExited(MouseEvent e) { card.setHovered(false); }
+        });
+        return card;
+    }
+
     private JLabel findValueLabelInCard(RoundedPanel card) {
         for (Component comp : card.getComponents()) {
             if (comp instanceof JPanel) {
@@ -395,18 +462,13 @@ public class dashboard extends JPanel {
         return new JLabel("Error");
     }
 
-    /**
-     * Membuat kartu selamat datang. (Padding sudah diperbaiki)
-     */
     private RoundedPanel createWelcomeCard() {
         RoundedPanel card = new RoundedPanel(20, new Color(255, 255, 255));
         card.setLayout(new BorderLayout());
-        card.setBorder(new EmptyBorder(25, 30, 25, 30)); // padding luar card
+        card.setBorder(new EmptyBorder(25, 30, 25, 30));
         card.setShadowVisible(true);
 
-        String nama = (user != null && user.getNamaLengkap() != null)
-                ? user.getNamaLengkap()
-                : "Pengguna";
+        String nama = (user != null && user.getNamaLengkap() != null) ? user.getNamaLengkap() : "Pengguna";
 
         JLabel lblWelcome = new JLabel("👋 Selamat datang kembali, " + nama + "!");
         lblWelcome.setFont(new Font("Segoe UI Semibold", Font.BOLD, 20));
@@ -416,10 +478,9 @@ public class dashboard extends JPanel {
         lblSub.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         lblSub.setForeground(new Color(120, 120, 120));
 
-        // Panel isi teks dengan padding tambahan di dalam card
         JPanel inner = new JPanel(new GridLayout(2, 1, 0, 8));
         inner.setOpaque(false);
-        inner.setBorder(new EmptyBorder(10, 15, 10, 15)); // padding dalam isi teks
+        inner.setBorder(new EmptyBorder(10, 15, 10, 15));
         inner.add(lblWelcome);
         inner.add(lblSub);
 
@@ -427,10 +488,6 @@ public class dashboard extends JPanel {
         return card;
     }
 
-
-    /**
-     * [DIUBAH] Membuat kartu untuk grafik (awalnya berisi placeholder).
-     */
     private RoundedPanel createMainChartCard() {
         RoundedPanel card = new RoundedPanel(20, Color.WHITE);
         card.setLayout(new BorderLayout(0, 15));
@@ -442,122 +499,99 @@ public class dashboard extends JPanel {
         lblTitle.setForeground(new Color(50, 50, 50));
         card.add(lblTitle, BorderLayout.NORTH);
 
-        // [DIUBAH] Panel ini (sekarang jadi variabel instance) akan
-        // menampung placeholder, lalu diganti dengan ChartPanel.
         chartCardContentPanel = new JPanel(new BorderLayout());
         chartCardContentPanel.setOpaque(false);
-        
-        // Placeholder awal
+
         JLabel lblPlaceholder = new JLabel("📈 Memuat data grafik...");
         lblPlaceholder.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         lblPlaceholder.setForeground(new Color(150, 150, 150));
         lblPlaceholder.setHorizontalAlignment(SwingConstants.CENTER);
         chartCardContentPanel.add(lblPlaceholder, BorderLayout.CENTER);
 
-        chartCardContentPanel.setBorder(BorderFactory.createDashedBorder(
-                new Color(200, 200, 200), 1.2f, 5.0f, 2.0f, false));
+        chartCardContentPanel.setBorder(BorderFactory.createDashedBorder(new Color(200, 200, 200), 1.2f, 5.0f, 2.0f, false));
         chartCardContentPanel.setBackground(new Color(250, 250, 250));
         chartCardContentPanel.setOpaque(true);
 
         card.add(chartCardContentPanel, BorderLayout.CENTER);
         return card;
     }
-    
-    /**
-     * [BARU] Helper untuk membuat dan men-style objek JFreeChart.
-     */
+
     private JFreeChart createLineChart(XYDataset dataset) {
-        // Buat chart menggunakan TimeSeriesChart
         JFreeChart chart = ChartFactory.createTimeSeriesChart(
-            null,                      // Judul (sudah ada di kartu)
-            "Tanggal",                 // Label Sumbu X (Domain)
-            "Total Penjualan (Rp)",    // Label Sumbu Y (Range)
-            dataset,                   // Data
-            true,                      // Tampilkan Legenda
-            true,                      // Tampilkan Tooltip
-            false                      // Tanpa URL
+                null,
+                "Tanggal",
+                "Total Penjualan (Rp)",
+                dataset,
+                true,
+                true,
+                false
         );
 
-        // === STYLING ===
         Font segoeUI12 = new Font("Segoe UI", Font.PLAIN, 12);
         Font segoeUI10 = new Font("Segoe UI", Font.PLAIN, 10);
         Color gridColor = new Color(220, 220, 220);
-        Color chartBlue = new Color(33, 150, 243); // Warna dari kartu transaksi
+        Color chartBlue = new Color(33, 150, 243);
 
-        // Background
         chart.setBackgroundPaint(Color.WHITE);
-        chart.getLegend().setBackgroundPaint(Color.WHITE);
-        chart.getLegend().setItemFont(segoeUI12);
+        if (chart.getLegend() != null) {
+            chart.getLegend().setBackgroundPaint(Color.WHITE);
+            chart.getLegend().setItemFont(segoeUI12);
+        }
 
-        // Plot (Area gambar)
         XYPlot plot = (XYPlot) chart.getPlot();
         plot.setBackgroundPaint(new Color(250, 250, 250));
         plot.setDomainGridlinePaint(gridColor);
         plot.setRangeGridlinePaint(gridColor);
-        
-        // Sumbu Y (Range)
+
         NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
         rangeAxis.setLabelFont(segoeUI12);
         rangeAxis.setTickLabelFont(segoeUI10);
-        // Format Sumbu Y sebagai mata uang (opsional, tapi bagus)
         rangeAxis.setNumberFormatOverride(new DecimalFormat("Rp #,###"));
 
-        // Sumbu X (Domain/Tanggal)
         DateAxis domainAxis = (DateAxis) plot.getDomainAxis();
-        domainAxis.setDateFormatOverride(new SimpleDateFormat("dd MMM")); // Format tgl: "25 Des"
+        domainAxis.setDateFormatOverride(new SimpleDateFormat("dd MMM"));
         domainAxis.setLabelFont(segoeUI12);
         domainAxis.setTickLabelFont(segoeUI10);
 
-        // Renderer (Garis dan Titik)
         XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) plot.getRenderer();
-        renderer.setSeriesPaint(0, chartBlue); // Warna garis
-        renderer.setSeriesStroke(0, new BasicStroke(2.5f)); // Ketebalan garis
-        
-        // Style titik
+        renderer.setSeriesPaint(0, chartBlue);
+        renderer.setSeriesStroke(0, new BasicStroke(2.5f));
         renderer.setSeriesShapesVisible(0, true);
-        renderer.setSeriesShape(0, new Ellipse2D.Double(-3.5, -3.5, 7, 7)); // Ukuran titik
-        renderer.setSeriesFillPaint(0, chartBlue); // Warna isi titik
+        renderer.setSeriesShape(0, new Ellipse2D.Double(-3.5, -3.5, 7, 7));
+        renderer.setSeriesFillPaint(0, chartBlue);
         renderer.setUseFillPaint(true);
 
         return chart;
     }
 
-
-    /**
-     * [BARU] Membuat kartu untuk "Produk Terlaris".
-     */
     private RoundedPanel createTopProductCard() {
         RoundedPanel card = new RoundedPanel(20, Color.WHITE);
         card.setLayout(new BorderLayout(0, 15));
-        card.setBorder(new EmptyBorder(25, 25, 25, 25)); // padding luar card
+        card.setBorder(new EmptyBorder(25, 25, 25, 25));
         card.setShadowVisible(true);
 
-        // === Judul ===
         JLabel lblTitle = new JLabel("Produk Terlaris Hari Ini");
         lblTitle.setFont(new Font("Segoe UI Semibold", Font.BOLD, 18));
         lblTitle.setForeground(new Color(50, 50, 50));
         card.add(lblTitle, BorderLayout.NORTH);
 
-        // === Panel Konten ===
         topProductContentPanel = new JPanel();
         topProductContentPanel.setLayout(new BoxLayout(topProductContentPanel, BoxLayout.Y_AXIS));
         topProductContentPanel.setOpaque(true);
-        topProductContentPanel.setBackground(Color.WHITE); // putih bersih
-        topProductContentPanel.setBorder(new EmptyBorder(10, 10, 10, 10)); // padding isi
+        topProductContentPanel.setBackground(Color.WHITE);
+        topProductContentPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        // Placeholder awal
         topProductPlaceholder = new JLabel("<html><i>Memuat data produk...</i></html>");
         topProductPlaceholder.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         topProductPlaceholder.setForeground(new Color(120, 120, 120));
         topProductContentPanel.add(topProductPlaceholder);
 
-        // === ScrollPane ===
         JScrollPane scrollPane = new JScrollPane(topProductContentPanel);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.getViewport().setOpaque(true);
-        scrollPane.getViewport().setBackground(Color.WHITE); // pastikan putih
+        scrollPane.getViewport().setBackground(Color.WHITE);
         scrollPane.setOpaque(true);
-        scrollPane.setBackground(Color.WHITE); // juga putih
+        scrollPane.setBackground(Color.WHITE);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
@@ -565,61 +599,47 @@ public class dashboard extends JPanel {
         return card;
     }
 
-    /**
-     * [BARU] Mengisi kartu Produk Terlaris dengan dacreateTopCard()ta dari SwingWorker.
-     */
     private void populateTopProductCard(List<ProductSummary> products) {
-        topProductContentPanel.removeAll(); // Hapus placeholder
+        topProductContentPanel.removeAll();
 
         if (products.isEmpty()) {
             topProductPlaceholder.setText("<html><i>Belum ada produk terjual hari ini.</i></html>");
             topProductContentPanel.add(topProductPlaceholder);
         } else {
-            // Tampilkan (misal) 7 produk teratas
             int count = 0;
             for (ProductSummary product : products) {
-                if (count >= 7) break; // Batasi jumlah
-                
+                if (count >= 7) break;
                 topProductContentPanel.add(createProductRowPanel(product));
-                topProductContentPanel.add(Box.createVerticalStrut(15)); // Jarak antar item
+                topProductContentPanel.add(Box.createVerticalStrut(15));
                 count++;
             }
         }
-        
+
         topProductContentPanel.revalidate();
         topProductContentPanel.repaint();
     }
-    
-    /**
-     * [BARU] Helper untuk membuat satu baris item di kartu "Produk Terlaris".
-     */
+
     public JPanel createProductRowPanel(ProductSummary product) {
         JPanel row = new JPanel(new BorderLayout(12, 0));
         row.setOpaque(false);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30)); // Batasi tinggi baris
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
-        // Ikon (emoji simpel, tanpa dependensi file)
-        JLabel lblIcon = new JLabel("🏷️"); // Emoji Tag
+        JLabel lblIcon = new JLabel("🏷️");
         lblIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 16));
         row.add(lblIcon, BorderLayout.WEST);
 
-        // Nama Produk
         JLabel lblName = new JLabel(product.name);
         lblName.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         lblName.setForeground(new Color(60, 60, 60));
         row.add(lblName, BorderLayout.CENTER);
 
-        // Jumlah Terjual
         JLabel lblQty = new JLabel(product.quantity + " Pcs  ");
         lblQty.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        lblQty.setForeground(new Color(33, 150, 243)); // Warna biru
+        lblQty.setForeground(new Color(33, 150, 243));
         row.add(lblQty, BorderLayout.EAST);
-        
+
         return row;
     }
-
-
-    // ====== KELAS PANEL CUSTOM (DENGAN HOVER EFFECT) ======
 
     static class RoundedPanel extends JPanel {
         private int cornerRadius;

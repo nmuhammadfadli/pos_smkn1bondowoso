@@ -14,6 +14,7 @@ public class TransactionItem {
     private BigDecimal hargaUnit;
     private BigDecimal subtotal;
     private String namaBarang;
+    private BigDecimal hargaBeli;
 
 
 
@@ -32,4 +33,7 @@ public class TransactionItem {
     
     public String getNamaBarang() { return namaBarang; }
     public void setNamaBarang(String namaBarang) { this.namaBarang = namaBarang; }
+    
+    public BigDecimal getHargaBeli() { return hargaBeli; }
+    public void setHargaBeli(BigDecimal h) { this.hargaBeli = h; }
 }

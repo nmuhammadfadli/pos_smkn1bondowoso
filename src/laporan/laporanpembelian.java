@@ -118,7 +118,7 @@ public class laporanpembelian extends JPanel {
         DecimalFormat df = new DecimalFormat("#,###");
 
         // create summary panels but keep references to value labels for updates
-        JPanel pTotal = createSummaryPanelWithLabel("Total Pengeluaran", "Rp " + df.format(0), new Color(244, 67, 54));
+        JPanel pTotal = createSummaryPanelWithLabel("Total Modal", "Rp " + df.format(0), new Color(244, 67, 54));
         lblTotalPengeluaranValue = findValueLabelInSummary(pTotal);
 
         rightPanel.add(pTotal);
