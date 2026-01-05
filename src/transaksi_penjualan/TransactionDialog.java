@@ -37,6 +37,7 @@ public class TransactionDialog extends JDialog {
     private JTextField txtKodeTransaksi;
     private JLabel lblKasir;
     private JLabel lblTanggal;
+    private JComboBox<String> cbPaymentMethod;
 
     // Left form (names preserved to keep logic same)
     private JTextField txtBarcode = createRoundedField();
@@ -578,9 +579,18 @@ public class TransactionDialog extends JDialog {
         }
 
         String kodeTrans = txtKodeTransaksi.getText();
+        String metodeUi = (cbPaymentMethod != null && cbPaymentMethod.getSelectedItem() != null)
+        ? cbPaymentMethod.getSelectedItem().toString() : "Cash";
+String paymentMethodForDb;
+switch (metodeUi.toLowerCase()) {
+    case "cash": paymentMethodForDb = "CASH"; break;
+    case "kredit": paymentMethodForDb = "CREDIT"; break;
+    case "donasi": paymentMethodForDb = "DONASI"; break;
+    default: paymentMethodForDb = metodeUi.toUpperCase().replaceAll("\\s+","_"); break;
+}
 
         try {
-            txDao.processSale(items, voucherId, cashPaid, kodeTrans, currentUserId);
+           txDao.processSale(items, voucherId, cashPaid, kodeTrans, currentUserId, paymentMethodForDb);
             JOptionPane.showMessageDialog(this, "Transaksi berhasil. Kode: " + kodeTrans, "Sukses", JOptionPane.INFORMATION_MESSAGE);
 
             // reset UI

@@ -4,6 +4,7 @@ import supplier.*;
 import page.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File; // [PENTING] Tambahan import untuk cek file di luar JAR
 import java.sql.SQLException;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -31,7 +32,9 @@ public class editdataguru extends JPanel {
 
         JLabel imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        imageLabel.setIcon(new ImageIcon(getClass().getResource("/Icon/tambahbarang.png"))); // ganti sesuai path
+        
+        // [UBAH DI SINI] Gunakan helper method hybrid agar jalan di EXE & NetBeans
+        imageLabel.setIcon(loadTopImage("tambahbarang.png")); 
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
@@ -145,7 +148,31 @@ public class editdataguru extends JPanel {
         }
     }
 
-    // === RoundedTextField and RoundedButton are identical to tambahdataguru to preserve design ===
+    // ============================================================
+    // [BARU] HELPER METHOD UNTUK IMAGE (HYBRID EXE/NETBEANS)
+    // ============================================================
+    private ImageIcon loadTopImage(String fileName) {
+        // 1. CARA EXE: Cek folder luar "icon/" di folder instalasi
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            return new ImageIcon(pathDisk);
+        }
+
+        // 2. CARA NETBEANS: Cek resource internal "/Icon/"
+        java.net.URL url = getClass().getResource("/Icon/" + fileName);
+        if (url != null) {
+            return new ImageIcon(url);
+        }
+
+        // 3. Gagal total
+        System.err.println("Gambar header tidak ditemukan (Disk/Res): " + fileName);
+        return null;
+    }
+    // ============================================================
+
+    // === RoundedTextField and RoundedButton are identical to preserve design ===
     class RoundedTextField extends JTextField {
         private int radius = 15;
         public RoundedTextField(int size) { super(size); setOpaque(false); setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12)); }

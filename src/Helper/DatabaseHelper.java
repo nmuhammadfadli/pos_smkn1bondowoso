@@ -6,9 +6,11 @@ import barang.Barang;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,21 +19,47 @@ import java.util.List;
  * DatabaseHelper: inisialisasi DB + CRUD helper untuk barang, voucher, detail_barang.
  * Java 8 compatible. Package: testsqlite
  */
-public class DatabaseHelper {
-    private static final String DB_PATH = "data/pos_app.db";
-    private static final String URL = "jdbc:sqlite:" + DB_PATH;
+            public class DatabaseHelper {
+            // relative path (default). Will be resolved relative to folder JAR / working dir.
+            private static final String DB_PATH = "data/pos_app.db";
 
-    // ------------------ init & connection ------------------
-    public static void initDatabase() throws Exception {
-        System.out.println("Working dir: " + System.getProperty("user.dir"));
-        File dbFile = new File(DB_PATH);
-        if (dbFile.getParentFile() != null && !dbFile.getParentFile().exists()) {
-            dbFile.getParentFile().mkdirs();
-        }
-        boolean existed = dbFile.exists();
 
-        try (Connection conn = getConnection();
-             Statement stmt = conn.createStatement()) {
+            // ------------------ internal helpers untuk path & URL ------------------
+            private static File resolveDatabaseFile() {
+            try {
+            File codeSource = new File(DatabaseHelper.class.getProtectionDomain()
+            .getCodeSource()
+            .getLocation()
+            .toURI());
+            File appDir = codeSource.isFile() ? codeSource.getParentFile() : new File(System.getProperty("user.dir"));
+            File dbFile = new File(appDir, DB_PATH);
+            if (dbFile.getParentFile() != null && !dbFile.getParentFile().exists()) dbFile.getParentFile().mkdirs();
+            return dbFile;
+            } catch (URISyntaxException | SecurityException e) {
+            // fallback: working directory
+            File dbFile = new File(System.getProperty("user.dir"), DB_PATH);
+            if (dbFile.getParentFile() != null && !dbFile.getParentFile().exists()) dbFile.getParentFile().mkdirs();
+            return dbFile;
+            }
+            }
+
+
+            private static String getJdbcUrl() {
+            File dbFile = resolveDatabaseFile();
+            return "jdbc:sqlite:" + dbFile.getAbsolutePath();
+            }
+
+
+            // ------------------ init & connection ------------------
+            public static void initDatabase() throws Exception {
+            System.out.println("Working dir: " + System.getProperty("user.dir"));
+            File dbFile = resolveDatabaseFile();
+            boolean existed = dbFile.exists();
+
+
+            try (Connection conn = getConnection();
+            Statement stmt = conn.createStatement()) {
+
 
             // enable pragma early
             try { stmt.execute("PRAGMA foreign_keys = ON;"); } catch (Throwable t) {}
@@ -302,28 +330,32 @@ public class DatabaseHelper {
 
                 System.out.println("Database baru dibuat dan sample data disisipkan.");
             } else {
-                System.out.println("Database sudah ada: " + DB_PATH);
+                System.out.println("Database sudah ada: " + dbFile.getAbsolutePath());
             }
 
             // after init, print pengguna to help debugging (shows whether dummy present)
-            printAllPenggunaDetailed();
+           // printAllPenggunaDetailed();
         }
     }
 
-    public static Connection getConnection() throws SQLException {
+  
+
+        public static Connection getConnection() throws SQLException {
         try {
-            Class.forName("org.sqlite.JDBC");
+        Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException e) {
-            System.err.println("Driver SQLite tidak ditemukan. Pastikan sqlite-jdbc.jar ada di Libraries.");
+        System.err.println("Driver SQLite tidak ditemukan. Pastikan sqlite-jdbc.jar ada di Libraries.");
         }
-        Connection conn = DriverManager.getConnection(URL);
+        String url = getJdbcUrl();
+        //System.out.println("Using JDBC URL = " + url);
+        Connection conn = DriverManager.getConnection(url);
         try (Statement s = conn.createStatement()) {
-            s.execute("PRAGMA foreign_keys = ON;");
-            // jangan set WAL berulang-ubah jika tidak perlu, tapi boleh:
-            // s.execute("PRAGMA journal_mode = WAL;");
+        s.execute("PRAGMA foreign_keys = ON;");
+        // jangan set WAL berulang-ubah jika tidak perlu, tapi boleh:
+        // s.execute("PRAGMA journal_mode = WAL;");
         } catch (SQLException ignore) {}
         return conn;
-    }
+        }
 
 //    // ----- ensure sample pengguna exists even if DB file already existed -----
 //    private static void ensureSamplePengguna(Connection conn) {
@@ -427,32 +459,32 @@ public static String generateNextVoucherCode(Connection conn) throws SQLExceptio
     
     // helper: print contents of data_pengguna (for quick debugging)
    // print semua kolom (debug)
-public static void printAllPenggunaDetailed() {
-    String sql = "SELECT id_pengguna, username, password, alamat, jabatan, nama_lengkap, hak_akses, email, notelp_pengguna FROM data_pengguna ORDER BY id_pengguna";
-    try (Connection conn = getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql);
-         ResultSet rs = ps.executeQuery()) {
-        System.out.println("== daftar data_pengguna (detailed) ==");
-        int count = 0;
-        while (rs.next()) {
-            count++;
-            System.out.println("id_pengguna   : " + rs.getString("id_pengguna"));
-            System.out.println("username      : " + rs.getString("username"));
-            System.out.println("password      : " + rs.getString("password"));
-            System.out.println("alamat        : " + rs.getString("alamat"));
-            System.out.println("jabatan       : " + rs.getString("jabatan"));
-            System.out.println("nama_lengkap  : " + rs.getString("nama_lengkap"));
-            System.out.println("hak_akses     : " + rs.getObject("hak_akses"));
-            System.out.println("email         : " + rs.getString("email"));
-            System.out.println("notelp        : " + rs.getString("notelp_pengguna"));
-            System.out.println("----------------------------------------");
-        }
-        if (count == 0) System.out.println("(kosong)");
-        System.out.println("== end daftar data_pengguna ==");
-    } catch (Exception e) {
-        System.err.println("Gagal membaca data_pengguna: " + e.getMessage());
-    }
-}
+//public static void printAllPenggunaDetailed() {
+//    String sql = "SELECT id_pengguna, username, password, alamat, jabatan, nama_lengkap, hak_akses, email, notelp_pengguna FROM data_pengguna ORDER BY id_pengguna";
+//    try (Connection conn = getConnection();
+//         PreparedStatement ps = conn.prepareStatement(sql);
+//         ResultSet rs = ps.executeQuery()) {
+//        System.out.println("== daftar data_pengguna (detailed) ==");
+//        int count = 0;
+//        while (rs.next()) {
+//            count++;
+//            System.out.println("id_pengguna   : " + rs.getString("id_pengguna"));
+//            System.out.println("username      : " + rs.getString("username"));
+//            System.out.println("password      : " + rs.getString("password"));
+//            System.out.println("alamat        : " + rs.getString("alamat"));
+//            System.out.println("jabatan       : " + rs.getString("jabatan"));
+//            System.out.println("nama_lengkap  : " + rs.getString("nama_lengkap"));
+//            System.out.println("hak_akses     : " + rs.getObject("hak_akses"));
+//            System.out.println("email         : " + rs.getString("email"));
+//            System.out.println("notelp        : " + rs.getString("notelp_pengguna"));
+//            System.out.println("----------------------------------------");
+//        }
+//        if (count == 0) System.out.println("(kosong)");
+//        System.out.println("== end daftar data_pengguna ==");
+//    } catch (Exception e) {
+//        System.err.println("Gagal membaca data_pengguna: " + e.getMessage());
+//    }
+//}
 
 // kembalian programatik: list of maps (optional)
 public static List<java.util.Map<String,Object>> getAllPenggunaAsMap() throws SQLException {
@@ -842,10 +874,10 @@ public static List<DetailBarang> getAllDetailBarang() throws SQLException {
         }
     }
 
-    public static void backupDatabase(String targetPath) throws IOException {
-        Path src = Paths.get(DB_PATH);
-        Path dst = Paths.get(targetPath);
-        if (Files.notExists(src)) throw new IOException("Database file tidak ditemukan: " + src.toString());
-        Files.copy(src, dst);
-    }
-}
+        public static void backupDatabase(String targetPath) throws IOException {
+     Path src = resolveDatabaseFile().toPath();
+     Path dst = Paths.get(targetPath);
+     if (Files.notExists(src)) throw new IOException("Database file tidak ditemukan: " + src.toString());
+     Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING);
+     }
+     }

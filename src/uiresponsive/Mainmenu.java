@@ -16,9 +16,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
-import org.icepdf.ri.common.ComponentKeyBinding;
-import org.icepdf.ri.common.SwingController;
-import org.icepdf.ri.common.SwingViewBuilder;
+// Import panel-panel
 import page.dashboard;
 import barang.databarang;
 import barang.tambahdatabarang;
@@ -34,10 +32,12 @@ import pengguna.datapengguna;
 import pengguna.tambahdatapengguna;
 import pengguna.editdatapengguna;
 import hutang.datahutang;
+import java.awt.Window;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import transaksi_penjualan.transaksipenjualan;
 import transaksi_pembelian.transaksipembelian;
@@ -48,362 +48,409 @@ import pengguna.Pengguna;
 import voucher.datavoucher;
 import voucher.editdatavoucher;
 import voucher.tambahdatavoucher;
+
 /**
  *
  * @author ThinkPad
  */
 public class Mainmenu extends javax.swing.JFrame {
-boolean a = false;
-private javax.swing.JButton activeButton = null;
-private tambahdatabarang tambahDataPanel;
-private dashboard dashboardPanel;
-private databarang databarangPanel;
-private tambahdetailbarang tambahDetailPanel;
-private editdatabarang editDataBarangPanel;
-private datasupplier datasupplierPanel;
-private tambahdatasupplier tambahdatasupplierPanel;
-private editdatasupplier editdatasupplierPanel;
-private dataguru datagurupanel;
-private tambahdataguru tambahdatagurupanel;
-private editdataguru editdatagurupanel;
-private datapengguna datapenggunapanel;
-private tambahdatapengguna tambahdatapenggunapanel;
-private editdatapengguna editdatapenggunapanel;
-private datahutang datahutangpanel;
-private transaksipenjualan transaksipenjualanpanel;
-private transaksipembelian transaksipembelianpanel;
-private datakategori datakategoripanel;
-private laporanpenjualan datalaporanpenjualanpanel;
-private laporanpembelian datalaporanpembelianpanel;
-private datavoucher datavoucherpanel;
-private tambahdatavoucher tambahdatavoucherpanel;
-private editdatavoucher editdatavoucherpanel;
-  
-public Mainmenu() throws SQLException {
-    initComponents();
-    setUndecorated(true);
-    setExtendedState(MAXIMIZED_BOTH);
+    boolean a = false;
+    private javax.swing.JButton activeButton = null;
+    
+    // Deklarasi Panel
+    private tambahdatabarang tambahDataPanel;
+    private dashboard dashboardPanel;
+    private databarang databarangPanel;
+    private tambahdetailbarang tambahDetailPanel;
+    private editdatabarang editDataBarangPanel;
+    private datasupplier datasupplierPanel;
+    private tambahdatasupplier tambahdatasupplierPanel;
+    private editdatasupplier editdatasupplierPanel;
+    private dataguru datagurupanel;
+    private tambahdataguru tambahdatagurupanel;
+    private editdataguru editdatagurupanel;
+    private datapengguna datapenggunapanel;
+    private tambahdatapengguna tambahdatapenggunapanel;
+    private editdatapengguna editdatapenggunapanel;
+    private datahutang datahutangpanel;
+    private transaksipenjualan transaksipenjualanpanel;
+    private transaksipembelian transaksipembelianpanel;
+    private datakategori datakategoripanel;
+    private laporanpenjualan datalaporanpenjualanpanel;
+    private laporanpembelian datalaporanpembelianpanel;
+    private datavoucher datavoucherpanel;
+    private tambahdatavoucher tambahdatavoucherpanel;
+    private editdatavoucher editdatavoucherpanel;
+      
+    public Mainmenu() throws SQLException {
+        initComponents();
+        setUndecorated(true);
+        setExtendedState(MAXIMIZED_BOTH);
+        
+        // Terapkan hak akses user (Login)
         applyAccessControl();
 
-    // ====== DAFTAR TOMBOL YANG DIGUNAKAN SEKARANG ======
-    javax.swing.JButton[] buttons = {
-        dashboardbtn, databarangbtn, datakategoribtn,datasupplierbtn, datagurubtn, datapenggunabtn, datahutangbtn, transaksipenjualanbtn, transaksipenjualanbtnkasir, transaksipembelianbtn, laporanpenjualanbtn, laporanpembelianbtn, voucherbtn,keluarbtn
-    };
+        // ====== DAFTAR TOMBOL YANG DIGUNAKAN SEKARANG ======
+        javax.swing.JButton[] buttons = {
+            dashboardbtn, databarangbtn, datakategoribtn, datasupplierbtn, 
+            datagurubtn, datapenggunabtn, datahutangbtn, transaksipenjualanbtn, 
+            transaksipenjualanbtnkasir, transaksipembelianbtn, laporanpenjualanbtn, 
+            laporanpembelianbtn, voucherbtn, keluarbtn
+        };
 
-    // ====== SET ICON DEFAULT ======
-    setButtonIcon(dashboardbtn, "dashboard.png");
-    setButtonIcon(databarangbtn, "databarang.png");
-    setButtonIcon(datakategoribtn, "datakategori.png");
-    setButtonIcon(datasupplierbtn, "datasupplier.png");
-    setButtonIcon(datagurubtn, "dataguru.png");
-    setButtonIcon(datapenggunabtn, "datapengguna.png");
-    setButtonIcon(datahutangbtn, "datahutang.png");
-    setButtonIcon(transaksipenjualanbtn, "transaksipenjualan.png");
-    setButtonIcon(transaksipenjualanbtnkasir, "transaksipenjualan.png");
-    setButtonIcon(transaksipembelianbtn, "transaksipembelian.png");
-    setButtonIcon(laporanpenjualanbtn, "laporanpenjualan.png");
-    setButtonIcon(laporanpembelianbtn, "laporanpembelian.png");   
-    setButtonIcon(voucherbtn, "voucher.png");
-    setButtonIcon(keluarbtn, "keluar.png");
-    
-    // ====== SET POSISI TEKS, JARAK IKON, DAN STYLE ======
-    for (javax.swing.JButton btn : buttons) {
-        btn.setHorizontalTextPosition(javax.swing.SwingConstants.RIGHT);
-        btn.setIconTextGap(15);
-        styleSidebarButton(btn);
-    }
-
-    // ====== INISIASI PANEL ======
-    dashboardPanel = new dashboard();
-    databarangPanel = new databarang();
-    tambahDataPanel = new tambahdatabarang();
-    editDataBarangPanel = new editdatabarang();
-    tambahDetailPanel = new tambahdetailbarang();
-    editdatasupplierPanel = new editdatasupplier();
-    datasupplierPanel = new datasupplier();
-    tambahdatasupplierPanel = new tambahdatasupplier();
-    datagurupanel = new dataguru();
-    tambahdatagurupanel = new tambahdataguru();
-    editdatagurupanel = new editdataguru();
-    datapenggunapanel= new datapengguna();
-    tambahdatapenggunapanel = new tambahdatapengguna();
-    editdatapenggunapanel = new editdatapengguna();
-    datahutangpanel = new datahutang();
-
-    transaksipenjualanpanel = new transaksipenjualan();
-    transaksipembelianpanel = new transaksipembelian();
-    datakategoripanel = new datakategori();
-    datalaporanpenjualanpanel = new laporanpenjualan();
-    datalaporanpembelianpanel = new laporanpembelian();
-    datavoucherpanel = new datavoucher();
-    tambahdatavoucherpanel = new tambahdatavoucher();
-    editdatavoucherpanel = new editdatavoucher();
-    
-    // ====== PANEL DEFAULT ======
-        setActiveButton(dashboardbtn);
-    page.removeAll();
-    page.add(dashboardPanel);
-    page.revalidate();
-    page.repaint();
-}
-/**
- * [BARU] Method ini mengecek hak akses user dan menyembunyikan tombol
- * yang tidak perlu.
- */
-// Di dalam file Mainmenu.java
-// ...
-
-private void applyAccessControl() {
-    Pengguna user = UIResponsive.currentUser;
-
-    // [FIX] Tambahkan pengecekan null untuk mencegah crash
-    if (user == null) {
-        JOptionPane.showMessageDialog(this, 
-            "Gagal mendapatkan data user! Aplikasi akan ditutup.", 
-            "Error Kredensial", 
-            JOptionPane.ERROR_MESSAGE);
-        System.exit(0); // Tutup paksa jika user tidak ada
-        return; // Hentikan eksekusi method
-    }
-
-    // Kode Anda sebelumnya, sekarang aman dari NullPointerException
-    int hakAkses = user.getHakAkses(); 
-                
-    if (hakAkses == 1) { 
-        transaksipenjualanbtn.setVisible(false);
-        databarangbtn.setVisible(false);
-        datakategoribtn.setVisible(false);
-        datasupplierbtn.setVisible(false);
-        datagurubtn.setVisible(false);
-        datapenggunabtn.setVisible(false);
-        datahutangbtn.setVisible(false);
-        transaksipembelianbtn.setVisible(false);
-        laporanpenjualanbtn.setVisible(false);
-        laporanpembelianbtn.setVisible(false);
-        voucherbtn.setVisible(false);
-    }else if(hakAkses == 1) {
-        transaksipenjualanbtnkasir.setVisible(false);
-    }
-}
-private void styleSidebarButton(final javax.swing.JButton btn) {
-    btn.setFocusPainted(false);
-    btn.setBorderPainted(false);
-    btn.setContentAreaFilled(true);
-    btn.setOpaque(true);
-    btn.setBackground(new Color(245, 245, 245));
-    if (btn == transaksipenjualanbtn || btn == transaksipembelianbtn || btn == laporanpembelianbtn) {
-        btn.setFont(new java.awt.Font("Dialog", java.awt.Font.PLAIN, 14));
-    } else {
-        btn.setFont(new java.awt.Font("Dialog", java.awt.Font.PLAIN, 14));
-    }
-    btn.setForeground(new Color(45, 45, 45));
-    btn.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
-    btn.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 20, 10, 10));
-    btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-
-    btn.addMouseListener(new java.awt.event.MouseAdapter() {
-        @Override
-        public void mouseEntered(java.awt.event.MouseEvent e) {
-            // hover: override visual sementara
-            btn.setBackground(new Color(236, 28, 44));
-            btn.setForeground(Color.WHITE);
-            String name = getButtonName(btn);
-            if (name != null) {
-                setButtonIcon(btn, name + "hover.png");
-            }
+        // ====== SET ICON DEFAULT ======
+        // Method setButtonIcon di bawah sudah diperbaiki untuk EXE & NetBeans
+        setButtonIcon(dashboardbtn, "dashboard.png");
+        setButtonIcon(databarangbtn, "databarang.png");
+        setButtonIcon(datakategoribtn, "datakategori.png");
+        setButtonIcon(datasupplierbtn, "datasupplier.png");
+        setButtonIcon(datagurubtn, "dataguru.png");
+        setButtonIcon(datapenggunabtn, "datapengguna.png");
+        setButtonIcon(datahutangbtn, "datahutang.png");
+        setButtonIcon(transaksipenjualanbtn, "transaksipenjualan.png");
+        setButtonIcon(transaksipenjualanbtnkasir, "transaksipenjualan.png");
+        setButtonIcon(transaksipembelianbtn, "transaksipembelian.png");
+        setButtonIcon(laporanpenjualanbtn, "laporanpenjualan.png");
+        setButtonIcon(laporanpembelianbtn, "laporanpembelian.png");    
+        setButtonIcon(voucherbtn, "voucher.png");
+        setButtonIcon(keluarbtn, "keluar.png");
+        
+        // ====== SET POSISI TEKS, JARAK IKON, DAN STYLE ======
+        for (javax.swing.JButton btn : buttons) {
+            btn.setHorizontalTextPosition(javax.swing.SwingConstants.RIGHT);
+            btn.setIconTextGap(15);
+            styleSidebarButton(btn);
         }
 
-        @Override
-        public void mouseExited(java.awt.event.MouseEvent e) {
-            // hanya reset kalau bukan tombol aktif
-            if (activeButton == btn) {
-                // tombol aktif -> pastikan tetap terlihat aktif
+        // ====== INISIASI PANEL ======
+        dashboardPanel = new dashboard();
+        databarangPanel = new databarang();
+        tambahDataPanel = new tambahdatabarang();
+        editDataBarangPanel = new editdatabarang();
+        tambahDetailPanel = new tambahdetailbarang();
+        editdatasupplierPanel = new editdatasupplier();
+        datasupplierPanel = new datasupplier();
+        tambahdatasupplierPanel = new tambahdatasupplier();
+        datagurupanel = new dataguru();
+        tambahdatagurupanel = new tambahdataguru();
+        editdatagurupanel = new editdataguru();
+        datapenggunapanel= new datapengguna();
+        tambahdatapenggunapanel = new tambahdatapengguna();
+        editdatapenggunapanel = new editdatapengguna();
+        datahutangpanel = new datahutang();
+
+        transaksipenjualanpanel = new transaksipenjualan();
+        transaksipembelianpanel = new transaksipembelian();
+        datakategoripanel = new datakategori();
+        datalaporanpenjualanpanel = new laporanpenjualan();
+        datalaporanpembelianpanel = new laporanpembelian();
+        datavoucherpanel = new datavoucher();
+        tambahdatavoucherpanel = new tambahdatavoucher();
+        editdatavoucherpanel = new editdatavoucher();
+        
+        // ====== PANEL DEFAULT ======
+        setActiveButton(dashboardbtn);
+        page.removeAll();
+        page.add(dashboardPanel);
+        page.revalidate();
+        page.repaint();
+    }
+
+    /**
+     * Method ini mengecek hak akses user dan menyembunyikan tombol
+     * yang tidak perlu.
+     */
+    private void applyAccessControl() {
+        Pengguna user = UIResponsive.currentUser;
+
+        // Jika tidak ada user (mis. sementara logout sebelum login lagi)
+        if (user == null) {
+            transaksipenjualanbtn.setVisible(false);
+            databarangbtn.setVisible(false);
+            datakategoribtn.setVisible(false);
+            datasupplierbtn.setVisible(false);
+            datagurubtn.setVisible(false);
+            datapenggunabtn.setVisible(false);
+            datahutangbtn.setVisible(false);
+            transaksipembelianbtn.setVisible(false);
+            laporanpenjualanbtn.setVisible(false);
+            laporanpembelianbtn.setVisible(false);
+            voucherbtn.setVisible(false);
+            return;
+        }
+
+        // user tidak null => normal flow
+        int hakAkses = user.getHakAkses();
+
+        // Reset semua jadi visible true dulu
+        transaksipenjualanbtn.setVisible(true);
+        transaksipenjualanbtnkasir.setVisible(true);
+        databarangbtn.setVisible(true);
+        datakategoribtn.setVisible(true);
+        datasupplierbtn.setVisible(true);
+        datagurubtn.setVisible(true);
+        datapenggunabtn.setVisible(true);
+        datahutangbtn.setVisible(true);
+        transaksipembelianbtn.setVisible(true);
+        laporanpenjualanbtn.setVisible(true);
+        laporanpembelianbtn.setVisible(true);
+        voucherbtn.setVisible(true);
+
+        // Atur hak akses
+        if (hakAkses == 1) {
+            // User level 1 (Kasir) -> sembunyikan menu admin
+            transaksipenjualanbtn.setVisible(false); // Tombol admin hidden
+            databarangbtn.setVisible(false);
+            datakategoribtn.setVisible(false);
+            datasupplierbtn.setVisible(false);
+            datagurubtn.setVisible(false);
+            datapenggunabtn.setVisible(false);
+            datahutangbtn.setVisible(false);
+            transaksipembelianbtn.setVisible(false);
+            laporanpenjualanbtn.setVisible(false);
+            laporanpembelianbtn.setVisible(false);
+            voucherbtn.setVisible(false);
+        } else if (hakAkses == 2) {
+            // User level 2 (Admin) -> sembunyikan tombol khusus kasir
+            transaksipenjualanbtnkasir.setVisible(false);
+        }
+    }
+
+    private void styleSidebarButton(final javax.swing.JButton btn) {
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(true);
+        btn.setOpaque(true);
+        btn.setBackground(new Color(245, 245, 245));
+        
+        btn.setFont(new java.awt.Font("Dialog", java.awt.Font.PLAIN, 14));
+        
+        btn.setForeground(new Color(45, 45, 45));
+        btn.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+        btn.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 20, 10, 10));
+        btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+
+        btn.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                // hover: override visual sementara
                 btn.setBackground(new Color(236, 28, 44));
                 btn.setForeground(Color.WHITE);
                 String name = getButtonName(btn);
                 if (name != null) {
                     setButtonIcon(btn, name + "hover.png");
                 }
-            } else {
-                // tombol tidak aktif -> kembalikan normal
-                btn.setBackground(new Color(245, 245, 245));
-                btn.setForeground(new Color(45, 45, 45));
-                String name = getButtonName(btn);
-                if (name != null) {
-                    setButtonIcon(btn, name + ".png");
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                // hanya reset kalau bukan tombol aktif
+                if (activeButton == btn) {
+                    // tombol aktif -> pastikan tetap terlihat aktif
+                    btn.setBackground(new Color(236, 28, 44));
+                    btn.setForeground(Color.WHITE);
+                    String name = getButtonName(btn);
+                    if (name != null) {
+                        setButtonIcon(btn, name + "hover.png");
+                    }
+                } else {
+                    // tombol tidak aktif -> kembalikan normal
+                    btn.setBackground(new Color(245, 245, 245));
+                    btn.setForeground(new Color(45, 45, 45));
+                    String name = getButtonName(btn);
+                    if (name != null) {
+                        setButtonIcon(btn, name + ".png");
+                    }
                 }
             }
-        }
-    });
-}
+        });
+    }
 
-private void setActiveButton(javax.swing.JButton btn) {
-    // Kembalikan warna tombol sebelumnya
-    if (activeButton != null) {
-        activeButton.setBackground(new Color(245, 245, 245));
-        activeButton.setForeground(new Color(45, 45, 45));
-        String prevName = getButtonName(activeButton);
-        if (prevName != null) {
-            setButtonIcon(activeButton, prevName + ".png");
+    private void setActiveButton(javax.swing.JButton btn) {
+        // Kembalikan warna tombol sebelumnya
+        if (activeButton != null) {
+            activeButton.setBackground(new Color(245, 245, 245));
+            activeButton.setForeground(new Color(45, 45, 45));
+            String prevName = getButtonName(activeButton);
+            if (prevName != null) {
+                setButtonIcon(activeButton, prevName + ".png");
+            }
+        }
+
+        // Set tombol yang diklik jadi aktif
+        activeButton = btn;
+        btn.setBackground(new Color(236, 28, 44));
+        btn.setForeground(Color.WHITE);
+
+        String name = getButtonName(btn);
+        if (name != null) {
+            setButtonIcon(btn, name + "hover.png");
         }
     }
 
-    // Set tombol yang diklik jadi aktif
-    activeButton = btn;
-    btn.setBackground(new Color(236, 28, 44));
-    btn.setForeground(Color.WHITE);
+    // ============================================================
+    // HELPER UNTUK ICON (SUDAH DIPERBAIKI UNTUK EXE & NETBEANS)
+    // ============================================================
+    private void setButtonIcon(javax.swing.JButton btn, String fileName) {
+        // 1. CARA EXE: Cek folder "icon" di luar (sebelah file aplikasi)
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            btn.setIcon(new javax.swing.ImageIcon(pathDisk));
+            return;
+        }
 
-    String name = getButtonName(btn);
-    if (name != null) {
-        setButtonIcon(btn, name + "hover.png");
+        // 2. CARA NETBEANS: Cek resource internal "/Icon/"
+        java.net.URL url = getClass().getResource("/Icon/" + fileName);
+        if (url != null) {
+            btn.setIcon(new javax.swing.ImageIcon(url));
+            return;
+        }
+
+        // 3. Fallback jika gagal keduanya
+        System.err.println("Icon tidak ditemukan (Disk/Res): " + fileName);
     }
-}
-// ===== HELPER UNTUK ICON =====
-private void setButtonIcon(javax.swing.JButton btn, String fileName) {
-    btn.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Icon/" + fileName)));
-}
-/**
- * [BARU] Method ini mengecek hak akses user dan menyembunyikan tombol
- * yang tidak perlu.
- */
-private String getButtonName(javax.swing.JButton btn) {
-    if (btn == dashboardbtn) return "dashboard";
-    if (btn == databarangbtn) return "databarang";
-    if (btn == datakategoribtn) return "datakategori";
-    if (btn == datasupplierbtn) return "datasupplier";
-    if (btn == datagurubtn) return "dataguru";
-    if (btn == datapenggunabtn) return "datapengguna";
-    if (btn == datahutangbtn) return "datahutang";
-    if (btn == transaksipenjualanbtn) return "transaksipenjualan";
-    if (btn == transaksipenjualanbtnkasir) return "transaksipenjualan";
-    if (btn == transaksipembelianbtn) return "transaksipembelian";
-    if (btn == laporanpenjualanbtn) return "laporanpenjualan";
-    if (btn == laporanpembelianbtn) return "laporanpembelian";
-    if (btn == voucherbtn) return "voucher";
-    if (btn == keluarbtn) return "keluar";
-    // kalau mau aktifkan tombol lain nanti, tinggal tambahin di sini
-    return null;
-}
-//barang
-public void showDataBarangPanel() {
-    page.removeAll();
-    page.add(databarangPanel);
-    page.revalidate();
-    page.repaint();
-}
-public void showTambahDataBarang() {
-    page.removeAll();
-    page.add(tambahDataPanel);
-    page.revalidate();
-    page.repaint();
-}
-public void showTambahDetailBarang() {
-    page.removeAll();
-    page.add(tambahDetailPanel);
-    page.revalidate();
-    page.repaint();
-}
 
-public void showEditDataBarang() {
-    page.removeAll();
-    page.add(editDataBarangPanel);
-    page.revalidate();
-    page.repaint();
-}
+    private String getButtonName(javax.swing.JButton btn) {
+        if (btn == dashboardbtn) return "dashboard";
+        if (btn == databarangbtn) return "databarang";
+        if (btn == datakategoribtn) return "datakategori";
+        if (btn == datasupplierbtn) return "datasupplier";
+        if (btn == datagurubtn) return "dataguru";
+        if (btn == datapenggunabtn) return "datapengguna";
+        if (btn == datahutangbtn) return "datahutang";
+        if (btn == transaksipenjualanbtn) return "transaksipenjualan";
+        if (btn == transaksipenjualanbtnkasir) return "transaksipenjualan";
+        if (btn == transaksipembelianbtn) return "transaksipembelian";
+        if (btn == laporanpenjualanbtn) return "laporanpenjualan";
+        if (btn == laporanpembelianbtn) return "laporanpembelian";
+        if (btn == voucherbtn) return "voucher";
+        if (btn == keluarbtn) return "keluar";
+        return null;
+    }
 
-public void  showdatakategori(){
-    page.removeAll();
-    page.add(datakategoripanel);
-    page.revalidate();
-    page.repaint(); 
-}
+    // ================== PANEL NAVIGATION METHODS ==================
+    public void showDataBarangPanel() {
+        page.removeAll();
+        page.add(databarangPanel);
+        page.revalidate();
+        page.repaint();
+    }
+    public void showTambahDataBarang() {
+        page.removeAll();
+        page.add(tambahDataPanel);
+        page.revalidate();
+        page.repaint();
+    }
+    public void showTambahDetailBarang() {
+        page.removeAll();
+        page.add(tambahDetailPanel);
+        page.revalidate();
+        page.repaint();
+    }
 
-//supplier
-public void showDataSupplier() {
-    page.removeAll();
-    page.add(datasupplierPanel);
-    page.revalidate();
-    page.repaint();
-}
-public void showTambahDataSupplier() {
-    page.removeAll();
-    page.add(tambahdatasupplierPanel);
-    page.revalidate();
-    page.repaint();
-}
- public void showEditDataSupplier() {
-    page.removeAll();
-    page.add(editdatasupplierPanel);
-    page.revalidate();
-    page.repaint();
-}
- 
- //Guru
- public void showDataGuru() {
-    page.removeAll();
-    page.add(datagurupanel);
-    page.revalidate();
-    page.repaint();
-}
-public void showTambahDataGuru() {
-    page.removeAll();
-    page.add(tambahdatagurupanel);
-    page.revalidate();
-    page.repaint();
-}
- public void showEditDataGuru() {
-    page.removeAll();
-    page.add(editdatagurupanel);
-    page.revalidate();
-    page.repaint();
-} 
- // Pengguna
- public void showDataPengguna() {
-    page.removeAll();
-    page.add(datapenggunapanel);
-    page.revalidate();
-    page.repaint();
-}
-public void showTambahDataPengguna() {
-    page.removeAll();
-    page.add(tambahdatapenggunapanel);
-    page.revalidate();
-    page.repaint();
-}
- public void showEditDataPengguna() {
-    page.removeAll();
-    page.add(editdatapenggunapanel);
-    page.revalidate();
-    page.repaint();
-} 
-//hutang
- public void showDataHutang() {
-    page.removeAll();
-    page.add(datahutangpanel);
-    page.revalidate();
-    page.repaint();
-}
+    public void showEditDataBarang() {
+        page.removeAll();
+        page.add(editDataBarangPanel);
+        page.revalidate();
+        page.repaint();
+    }
+
+    public void showdatakategori(){
+        page.removeAll();
+        page.add(datakategoripanel);
+        page.revalidate();
+        page.repaint(); 
+    }
+
+    //supplier
+    public void showDataSupplier() {
+        page.removeAll();
+        page.add(datasupplierPanel);
+        page.revalidate();
+        page.repaint();
+    }
+    public void showTambahDataSupplier() {
+        page.removeAll();
+        page.add(tambahdatasupplierPanel);
+        page.revalidate();
+        page.repaint();
+    }
+     public void showEditDataSupplier() {
+        page.removeAll();
+        page.add(editdatasupplierPanel);
+        page.revalidate();
+        page.repaint();
+    }
+     
+     //Guru
+     public void showDataGuru() {
+        page.removeAll();
+        page.add(datagurupanel);
+        page.revalidate();
+        page.repaint();
+    }
+    public void showTambahDataGuru() {
+        page.removeAll();
+        page.add(tambahdatagurupanel);
+        page.revalidate();
+        page.repaint();
+    }
+     public void showEditDataGuru() {
+        page.removeAll();
+        page.add(editdatagurupanel);
+        page.revalidate();
+        page.repaint();
+    } 
+     // Pengguna
+     public void showDataPengguna() {
+        page.removeAll();
+        page.add(datapenggunapanel);
+        page.revalidate();
+        page.repaint();
+    }
+    public void showTambahDataPengguna() {
+        page.removeAll();
+        page.add(tambahdatapenggunapanel);
+        page.revalidate();
+        page.repaint();
+    }
+     public void showEditDataPengguna() {
+        page.removeAll();
+        page.add(editdatapenggunapanel);
+        page.revalidate();
+        page.repaint();
+    } 
+    //hutang
+     public void showDataHutang() {
+        page.removeAll();
+        page.add(datahutangpanel);
+        page.revalidate();
+        page.repaint();
+    }
 
 
-//voucher
- public void showDataVoucher() {
-    page.removeAll();
-    page.add(datavoucherpanel);
-    page.revalidate();
-    page.repaint();
-}
-public void showTambahDataVoucher() {
-    page.removeAll();
-    page.add(tambahdatavoucherpanel);
-    page.revalidate();
-    page.repaint();
-}
- public void showEditDataVoucher() {
-    page.removeAll();
-    page.add(editdatavoucherpanel);
-    page.revalidate();
-    page.repaint();
-} 
+    //voucher
+     public void showDataVoucher() {
+        page.removeAll();
+        page.add(datavoucherpanel);
+        page.revalidate();
+        page.repaint();
+    }
+    public void showTambahDataVoucher() {
+        page.removeAll();
+        page.add(tambahdatavoucherpanel);
+        page.revalidate();
+        page.repaint();
+    }
+     public void showEditDataVoucher() {
+        page.removeAll();
+        page.add(editdatavoucherpanel);
+        page.revalidate();
+        page.repaint();
+    }
+
 
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
@@ -711,17 +758,28 @@ public void showTambahDataVoucher() {
     }// </editor-fold>//GEN-END:initComponents
     
   
-    
-
-    
     public void changecolor(JPanel hover, Color rand){
         hover.setBackground(rand);
     }
     
+    public void onUserChanged(Pengguna user) {
+        // update session (sudah di caller tapi aman kalau mau double set)
+        UIResponsive.currentUser = user;
+
+        // refresh hak akses dan tampilan
+        applyAccessControl();
+
+        // contoh: kalau ada panel dashboard yang butuh load ulang
+        try {
+            if (dashboardPanel != null) dashboardPanel.loadDashboardData();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
     public void clickmenu(JPanel h1, JPanel h2, int numberbool){
         if(numberbool == 1){
             h1.setBackground(new Color(245, 245, 245));
-
         }
         else{
             h1.setBackground(new Color(245, 245, 245));
@@ -729,21 +787,50 @@ public void showTambahDataVoucher() {
         }
     }
     
+    // ====================================================================
+    // PERBAIKAN: Method changeimage (Hybrid: EXE & NetBeans)
+    // ====================================================================
     public void changeimage(JLabel button, String resourcheimg){
-        ImageIcon aimg = new ImageIcon(getClass().getResource(resourcheimg));
-        button.setIcon(aimg);
+        // input resourcheimg biasanya: "/Icon/namafile.png"
+        
+        // 1. Ambil nama filenya saja (buang "/Icon/")
+        String fileNameOnly = resourcheimg;
+        if (resourcheimg.contains("/")) {
+            // Mengambil teks setelah garis miring terakhir
+            fileNameOnly = resourcheimg.substring(resourcheimg.lastIndexOf("/") + 1);
+        }
+
+        // 2. CARA EXE: Cek di folder luar "icon/"
+        String externalPath = "icon/" + fileNameOnly;
+        File f = new File(externalPath);
+        
+        if (f.exists()) {
+            button.setIcon(new ImageIcon(externalPath));
+            return; // Sukses di folder luar
+        }
+
+        // 3. CARA NETBEANS: Cek di dalam resource JAR (pakai path asli)
+        java.net.URL url = getClass().getResource(resourcheimg);
+        if (url != null) {
+            button.setIcon(new ImageIcon(url));
+            return; // Sukses di dalam JAR
+        }
+
+        // 4. Gagal
+        System.err.println("Gagal load image (changeimage): " + resourcheimg);
     }
     
     public void hideshow(JPanel menushowhide, boolean dashboard, JLabel button){
         if(dashboard == true){
             menushowhide.setPreferredSize(new Dimension(50, menushowhide.getHeight()));
+            // Ini akan otomatis ditangani oleh changeimage yang baru
             changeimage(button, "/Icon/menu_32px.png");
         }
         else{
             menushowhide.setPreferredSize(new Dimension(270, menushowhide.getHeight()));
+            // Ini akan otomatis ditangani oleh changeimage yang baru
             changeimage(button, "/Icon/back_32px.png");
         }
-        
     }
     
     private void closeMouseEntered(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_closeMouseEntered
@@ -849,23 +936,35 @@ public void showTambahDataVoucher() {
     }//GEN-LAST:event_datahutangbtnActionPerformed
 
     private void keluarbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_keluarbtnActionPerformed
-    setActiveButton(keluarbtn); 
-int pilihan = JOptionPane.showConfirmDialog(
-        this, // 'this' merujuk ke panel
+    setActiveButton(keluarbtn);
+
+    int pilihan = JOptionPane.showConfirmDialog(
+        this,
         "Anda yakin ingin keluar dan kembali ke halaman Login?",
         "Konfirmasi Keluar",
         JOptionPane.YES_NO_OPTION,
         JOptionPane.QUESTION_MESSAGE
     );
 
-    // 2. Hanya lakukan sesuatu jika user memilih "YA"
-    if (pilihan == JOptionPane.YES_OPTION) {
+    if (pilihan != JOptionPane.YES_OPTION) return;
 
-        dispose();
+    // Sembunyikan main window (jangan dispose)
+    this.setVisible(false);
 
-        LoginDialog loginDialog = new LoginDialog(null);
-        loginDialog.setVisible(true);
-    } // TODO add your handling code here:
+    // Tampilkan LoginDialog modal dengan parent = this
+    LoginDialog loginDialog = new LoginDialog(this);
+    loginDialog.setLocationRelativeTo(this);
+    loginDialog.setVisible(true); // blocking sampai dialog dispose()
+
+    // Jika login sukses -> set currentUser lalu refresh UI
+    if (loginDialog.isSucceeded()) {
+        UIResponsive.currentUser = loginDialog.getLoggedUser();
+        onUserChanged(UIResponsive.currentUser);
+        this.setVisible(true);
+    } else {
+        // Jika batal/close dialog -> kembali ke main (atau exit jika memang mau)
+        this.setVisible(true);
+    }
     }//GEN-LAST:event_keluarbtnActionPerformed
 
     private void transaksipembelianbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_transaksipembelianbtnActionPerformed

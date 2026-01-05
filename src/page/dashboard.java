@@ -89,22 +89,25 @@ public class dashboard extends JPanel {
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.BOTH;
 
-        // ROW 0 - welcome
+        // ROW 0 - welcome (now spans 5 columns)
         gbc.gridy = 0;
         gbc.gridx = 0;
-        gbc.gridwidth = 4;
+        gbc.gridwidth = 5;          // <-- changed to 5
         gbc.weightx = 1.0;
         gbc.weighty = 0.0;
         add(createWelcomeCard(), gbc);
 
-        // ROW 1 - 4 cards
+        // ROW 1 - 5 cards (Penjualan, Transaksi, Barang Terjual, Pembelian, Laba)
         gbc.gridy = 1;
         gbc.gridwidth = 1;
-        gbc.weightx = 0.25;
         gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.BOTH;
         gbc.insets = new Insets(10, 10, 10, 10);
 
-        // Card 1
+        // make each card take equal horizontal space
+        gbc.weightx = 0.2;
+
+        // Card 1: Penjualan
         gbc.gridx = 0;
         RoundedPanel cardPenjualan = createTopCard(
                 "Penjualan", "Memuat...",
@@ -112,7 +115,7 @@ public class dashboard extends JPanel {
         lblTotalPenjualanValue = findValueLabelInCard(cardPenjualan);
         add(cardPenjualan, gbc);
 
-        // Card 2
+        // Card 2: Transaksi
         gbc.gridx = 1;
         RoundedPanel cardTransaksi = createTopCard(
                 "Transaksi", "Memuat...",
@@ -120,7 +123,7 @@ public class dashboard extends JPanel {
         lblJumlahTransaksiValue = findValueLabelInCard(cardTransaksi);
         add(cardTransaksi, gbc);
 
-        // Card 3
+        // Card 3: Barang Terjual
         gbc.gridx = 2;
         RoundedPanel cardBarang = createTopCard(
                 "Barang Terjual", "Memuat...",
@@ -128,38 +131,32 @@ public class dashboard extends JPanel {
         lblBarangTerjualValue = findValueLabelInCard(cardBarang);
         add(cardBarang, gbc);
 
-        // Card 4: Pembelian + Laba (komposit)
+        // Card 4: Pembelian
         gbc.gridx = 3;
         RoundedPanel cardPembelian = createTopCard(
                 "Pembelian", "Memuat...",
                 "/Icon/totalpembelian.png", new Color(244, 67, 54));
         lblTotalPembelianValue = findValueLabelInCard(cardPembelian);
+        add(cardPembelian, gbc);
 
-        RoundedPanel labaCard = createSmallCard(
+        // Card 5: Laba (use same createTopCard so size matches others)
+        gbc.gridx = 4;
+        RoundedPanel labaCard = createTopCard(
                 "Laba", "Rp 0",
-                "/Icon/laba.png", new Color(76, 175, 80));
+                "/Icon/totalpenjualan.png", new Color(76, 175, 80));
         lblLabaValue = findValueLabelInCard(labaCard);
+        add(labaCard, gbc);
 
-        JPanel composite = new JPanel(new BorderLayout(10, 0));
-        composite.setOpaque(false);
-        composite.add(cardPembelian, BorderLayout.CENTER);
-        JPanel eastHolder = new JPanel(new BorderLayout());
-        eastHolder.setOpaque(false);
-        eastHolder.add(labaCard, BorderLayout.CENTER);
-        composite.add(eastHolder, BorderLayout.EAST);
-
-        add(composite, gbc);
-
-        // ROW 2 - chart (3) + top products (1)
+        // ROW 2 - chart (4 columns) + top products (1 column)
         gbc.gridy = 2;
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
 
         gbc.gridx = 0;
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 4; // chart occupies 4 columns now
         add(createMainChartCard(), gbc);
 
-        gbc.gridx = 3;
+        gbc.gridx = 4;
         gbc.gridwidth = 1;
         add(createTopProductCard(), gbc);
 
@@ -356,6 +353,7 @@ public class dashboard extends JPanel {
     private RoundedPanel createTopCard(String title, String initialValue, String iconName, Color bgColor) {
         RoundedPanel card = new RoundedPanel(20, bgColor);
         card.setLayout(new BorderLayout(25, 0));
+        // set same preferred size for all top cards
         card.setPreferredSize(new Dimension(220, 150));
         card.setBorder(new EmptyBorder(20, 25, 20, 25));
         card.setShadowVisible(true);
@@ -401,6 +399,7 @@ public class dashboard extends JPanel {
         return card;
     }
 
+    // reuse createTopCard for uniformity; keep createSmallCard for other uses if needed
     private RoundedPanel createSmallCard(String title, String initialValue, String iconName, Color bgColor) {
         RoundedPanel card = new RoundedPanel(16, bgColor);
         card.setLayout(new BorderLayout(10, 0));

@@ -96,7 +96,7 @@ public class datakategori extends JPanel {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
         buttonPanel.setOpaque(false);
 
-        btnTambah = createButton("Tambah Guru", new Color(46, 204, 113));
+        btnTambah = createButton("Tambah", new Color(46, 204, 113));
         btnEdit = createButton("Edit", new Color(52, 152, 219));
         btnHapus = createButton("Hapus", new Color(231, 76, 60));
         btnRefresh = createButton("Refresh", new Color(155, 89, 182));

@@ -2,6 +2,7 @@ package supplier;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File; // [PENTING] Tambahan import untuk cek file
 import java.sql.SQLException;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -10,6 +11,7 @@ import javax.swing.border.EmptyBorder;
  * editdatasupplier - desain persis seperti yang kamu minta.
  * Tambahan: HierarchyListener untuk memastikan loadFromContext() terpanggil
  * ketika panel benar-benar ditampilkan (robust terhadap cara Mainmenu menambahkan panel).
+ * Pemanggilan gambar sudah diperbaiki (Hybrid) agar jalan di EXE.
  */
 public class editdatasupplier extends JPanel {
 
@@ -58,7 +60,9 @@ public class editdatasupplier extends JPanel {
 
         JLabel imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        imageLabel.setIcon(new ImageIcon(getClass().getResource("/Icon/tambahbarang.png"))); // ganti sesuai path
+        
+        // [UBAH DI SINI] Gunakan helper method hybrid
+        imageLabel.setIcon(loadTopImage("tambahbarang.png")); 
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
@@ -191,6 +195,30 @@ public class editdatasupplier extends JPanel {
             JOptionPane.showMessageDialog(this, "Gagal menyimpan perubahan:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+
+    // ============================================================
+    // [BARU] HELPER METHOD UNTUK IMAGE (HYBRID EXE/NETBEANS)
+    // ============================================================
+    private ImageIcon loadTopImage(String fileName) {
+        // 1. CARA EXE: Cek folder luar "icon/"
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            return new ImageIcon(pathDisk);
+        }
+
+        // 2. CARA NETBEANS: Cek resource internal "/Icon/"
+        java.net.URL url = getClass().getResource("/Icon/" + fileName);
+        if (url != null) {
+            return new ImageIcon(url);
+        }
+
+        // 3. Gagal total
+        System.err.println("Gambar header tidak ditemukan (Disk/Res): " + fileName);
+        return null;
+    }
+    // ============================================================
 
     // === Rounded TextField & Button sama persis desainnya ===
     class RoundedTextField extends JTextField {

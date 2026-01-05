@@ -8,6 +8,7 @@ import java.sql.*;
 import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
+import java.io.File; // [PENTING] Tambahan import untuk cek file
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
@@ -23,8 +24,7 @@ import Helper.DatabaseHelper;
  * Row0: Kode | Barcode | Stok
  * Row1: Harga Jual | Expired | (spacer)
  * Row2: Nama Barang | Kategori | Supplier
- *
- * Kategori & Supplier hanya editable di per-detail mode.
+ * * Pemanggilan gambar sudah diperbaiki (Hybrid) agar jalan di EXE.
  */
 public class editdatabarang extends JPanel {
     private RoundedTextField txtKode;
@@ -63,14 +63,9 @@ public class editdatabarang extends JPanel {
         // Tambahkan icon/gambar tanpa mengubah UI lain
         JLabel imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        try {
-            // gunakan resource path yang sama seperti versi sebelumnya
-            ImageIcon ic = new ImageIcon(getClass().getResource("/Icon/tambahbarang.png"));
-            imageLabel.setIcon(ic);
-        } catch (Exception ex) {
-            // jika resource tidak ditemukan, biarkan kosong (tidak mengganggu UI)
-            imageLabel.setText("");
-        }
+        
+        // [UBAH DI SINI] Gunakan helper method hybrid
+        imageLabel.setIcon(loadTopImage("tambahbarang.png")); 
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
@@ -361,6 +356,30 @@ public class editdatabarang extends JPanel {
         txtSupplier.setEnabled(false);
     }
 
+    // ============================================================
+    // [BARU] HELPER METHOD UNTUK IMAGE (HYBRID EXE/NETBEANS)
+    // ============================================================
+    private ImageIcon loadTopImage(String fileName) {
+        // 1. CARA EXE: Cek folder luar "icon/"
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            return new ImageIcon(pathDisk);
+        }
+
+        // 2. CARA NETBEANS: Cek resource internal "/Icon/"
+        java.net.URL url = getClass().getResource("/Icon/" + fileName);
+        if (url != null) {
+            return new ImageIcon(url);
+        }
+
+        // 3. Gagal total
+        System.err.println("Gambar header tidak ditemukan (Disk/Res): " + fileName);
+        return null;
+    }
+    // ============================================================
+
     // helper UI classes follow (RoundedTextField, RoundedButton)
     class RoundedTextField extends JTextField {
         private int radius = 12;
@@ -398,11 +417,8 @@ public class editdatabarang extends JPanel {
     }
 
     // PilihKategoriFrame & PilihSupplierFrame (sama implementasi seperti sebelumnya)
-    class PilihKategoriFrame extends JFrame { /* ... same as previous implementation ... */
-        // copy your existing implementations (loadKategoriIntoModel etc) here
-        // For brevity in this listing I'm omitting full body; keep your prior working code here.
+    class PilihKategoriFrame extends JFrame {
         public PilihKategoriFrame(JTextField targetField) {
-            // paste earlier implementation (unchanged)
             setTitle("Pilih Kategori Barang");
             setSize(600,450);
             setLocationRelativeTo(null);

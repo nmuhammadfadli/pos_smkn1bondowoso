@@ -16,6 +16,8 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import Helper.DatabaseHelper;
+import barang.Barang;
+import barang.BarangDAO;
 import barang.DetailBarangDAO;
 import barang.DetailBarang;
 import java.text.DecimalFormat;
@@ -41,8 +43,8 @@ public class transaksipembelian extends JPanel {
     private JComboBox<String> cmbMetodeBayar;
     
     // Tombol & Checkbox
-    private JButton btnHapus, btnSimpan, btnCetak;
-    private JCheckBox chkLangsungCetak; // [BARU] Checkbox Cetak Otomatis
+    private JButton btnHapus, btnSimpan;
+   
 
     // ==== PALETTE WARNA ====
     private final Color BG_MAIN = new Color(242, 245, 255); 
@@ -202,29 +204,16 @@ public class transaksipembelian extends JPanel {
         btnPanel.setOpaque(false);
         btnPanel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
-        btnCetak = createModernButton("Cetak", BTN_PURPLE);
         btnSimpan = createModernButton("Simpan", BTN_GREEN);
         btnHapus = createModernButton("Hapus", BTN_RED);
 
-        btnPanel.add(btnCetak);
         btnPanel.add(btnSimpan);
         btnPanel.add(btnHapus);
 
-        // Panel Checkbox (FlowLayout Right)
-        JPanel checkPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 5));
-        checkPanel.setOpaque(false);
-        checkPanel.setAlignmentX(Component.RIGHT_ALIGNMENT);
-
-        chkLangsungCetak = new JCheckBox("Langsung Cetak Nota?");
-        chkLangsungCetak.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        chkLangsungCetak.setOpaque(false);
-        chkLangsungCetak.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        
-        checkPanel.add(chkLangsungCetak);
+ 
 
         // Gabung
         bottomRight.add(btnPanel);
-        bottomRight.add(checkPanel);
 
         bottomPanel.add(bottomLeft, BorderLayout.WEST);
         bottomPanel.add(bottomRight, BorderLayout.EAST); 
@@ -424,7 +413,6 @@ public class transaksipembelian extends JPanel {
         // 6. Buttons
         btnHapus.addActionListener(e -> onHapus());
         btnSimpan.addActionListener(e -> onSimpan());
-        btnCetak.addActionListener(e -> onCetak()); // Manual click
     }
 
     private void onTambah() {
@@ -507,10 +495,7 @@ public class transaksipembelian extends JPanel {
 
             JOptionPane.showMessageDialog(this, "Transaksi Berhasil! ID: " + idPembelian);
             
-            // [LOGIC BARU] Cek Checkbox Cetak Otomatis
-            if (chkLangsungCetak.isSelected()) {
-                onCetak();
-            }
+         
             
             resetFields();
 
@@ -530,10 +515,6 @@ public class transaksipembelian extends JPanel {
         }
     }
 
-    private void onCetak() { 
-        JOptionPane.showMessageDialog(this, "Fitur Cetak Struk sedang diproses...");
-        // Tambahkan logic JasperReport/PrintService di sini
-    }
 
     private void updateTotalUI() {
         int tot = cart.stream().mapToInt(DetailPembelian::getSubtotal).sum();
@@ -637,16 +618,67 @@ public class transaksipembelian extends JPanel {
             add(p); setVisible(true);
         }
 
-        private void loadData(DefaultTableModel m, String q) {
-            m.setRowCount(0);
-            try {
-                DetailBarangDAO dao = new DetailBarangDAO();
-                for(DetailBarang d : dao.findAll()) {
-                    boolean match = q.isEmpty() || d.getNamaBarang().toLowerCase().contains(q.toLowerCase());
-                    if(match) m.addRow(new Object[]{d.getIdBarang(), d.getNamaBarang(), formatThousand(d.getHargaJual().intValue()), d.getStok()});
-                }
-            } catch(Exception e){}
+    private void loadData(DefaultTableModel m, String q) {
+    m.setRowCount(0);
+    String keyword = q == null ? "" : q.trim().toLowerCase();
+
+    try {
+        DetailBarangDAO detailDao = new DetailBarangDAO();
+        BarangDAO barangDao = new BarangDAO();
+
+        List<DetailBarang> detailList = detailDao.findAll();
+        Set<Integer> barangSudahAdaDetail = new HashSet<>();
+
+        for (DetailBarang d : detailList) {
+            Integer idBarang = d.getIdBarang();
+            String nama = d.getNamaBarang() == null ? "-" : d.getNamaBarang();
+            String harga = d.getHargaJual() == null ? "-" : formatThousand(d.getHargaJual().intValue());
+           String stok = d.getStok() <= 0 ? "-" : String.valueOf(d.getStok());
+            String barcode = d.getBarcode() == null ? "" : d.getBarcode();
+
+            boolean match = keyword.isEmpty()
+                    || nama.toLowerCase().contains(keyword)
+                    || barcode.toLowerCase().contains(keyword);
+
+            if (match) {
+                m.addRow(new Object[]{
+                        idBarang,
+                        nama,
+                        harga,
+                        stok
+                });
+            }
+
+            if (idBarang != null) barangSudahAdaDetail.add(idBarang);
         }
+
+        // 2️⃣ TAMPILKAN BARANG MASTER (YANG BELUM PERNAH DIBELI)
+        for (Barang b : barangDao.findAll()) {
+            Integer id = b.getId();
+
+            // ❗ skip jika sudah punya detail
+            if (id != null && barangSudahAdaDetail.contains(id)) continue;
+
+            String nama = b.getNama() == null ? "-" : b.getNama();
+
+            boolean match = keyword.isEmpty()
+                    || nama.toLowerCase().contains(keyword);
+
+            if (match) {
+                m.addRow(new Object[]{
+                        id,
+                        nama,
+                        "-",   // ❗ BELUM PERNAH DIBELI → tidak punya harga
+                        "-"    // ❗ BELUM PERNAH DIBELI → tidak punya stok
+                });
+            }
+        }
+
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+
     }
 
     class PilihSupplierFrame extends JFrame {

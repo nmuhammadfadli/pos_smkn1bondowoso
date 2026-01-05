@@ -2,13 +2,14 @@ package pengguna;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File; // [PENTING] Tambahan import untuk cek file di luar JAR
 import java.sql.SQLException;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
 /**
  * tambahdatapengguna - UI desain dipertahankan; sekarang berfungsi insert & update.
- * [FIX] Menggunakan JComboBox untuk Hak Akses.
+ * Pemanggilan gambar sudah diperbaiki (Hybrid).
  */
 public class tambahdatapengguna extends JPanel {
 
@@ -19,8 +20,7 @@ public class tambahdatapengguna extends JPanel {
     private RoundedTextField txtAlamat;
     private RoundedTextField txtJabatan;
     private RoundedTextField txtNamaLengkap;
-    // private RoundedTextField txtHakAkses; // [FIX] Diganti
-    private JComboBox<String> cmbHakAkses; // [FIX] Menjadi JComboBox
+    private JComboBox<String> cmbHakAkses; 
     private RoundedTextField txtEmail;
     private RoundedTextField txtNotelp;
 
@@ -45,7 +45,9 @@ public class tambahdatapengguna extends JPanel {
 
         JLabel imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        imageLabel.setIcon(new ImageIcon(getClass().getResource("/Images/pengguna.png"))); // tetap
+        
+        // [UBAH DI SINI] Gunakan helper method hybrid agar jalan di EXE & NetBeans
+        imageLabel.setIcon(loadTopImage("pengguna.png")); 
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
@@ -71,10 +73,7 @@ public class tambahdatapengguna extends JPanel {
         txtJabatan = addField(formPanel, gbc, 4, "Jabatan:");
         txtNamaLengkap = addField(formPanel, gbc, 5, "Nama Lengkap:");
         
-        // [FIX] Hapus baris ini:
-        // txtHakAkses = addField(formPanel, gbc, 6, "Hak Akses:");
-        
-        // [FIX] Tambahkan JComboBox Hak Akses secara manual
+        // Tambahkan JComboBox Hak Akses secara manual
         gbc.gridx = 6 % 3; // Kolom 0
         gbc.gridy = 6 / 3; // Baris 2
 
@@ -87,7 +86,6 @@ public class tambahdatapengguna extends JPanel {
         String[] hakAksesOptions = {"Admin", "Kasir"};
         cmbHakAkses = new JComboBox<>(hakAksesOptions);
         cmbHakAkses.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        // Atur tinggi agar konsisten (TextField kustom Anda tingginya sekitar 38px)
         cmbHakAkses.setPreferredSize(new Dimension(0, 38)); 
 
         hakAksesPanel.add(lblHakAkses, BorderLayout.NORTH);
@@ -162,7 +160,7 @@ public class tambahdatapengguna extends JPanel {
         txtAlamat.setText("");
         txtJabatan.setText("");
         txtNamaLengkap.setText("");
-        cmbHakAkses.setSelectedIndex(0); // [FIX] Reset ke "Admin" (index 0)
+        cmbHakAkses.setSelectedIndex(0); // Reset ke "Admin" (index 0)
         txtEmail.setText("");
         txtNotelp.setText("");
 
@@ -182,7 +180,7 @@ public class tambahdatapengguna extends JPanel {
             txtJabatan.setText(p.getJabatan());
             txtNamaLengkap.setText(p.getNamaLengkap());
             
-            // [FIX] Set ComboBox berdasarkan nilai 0 (Admin) atau 1 (Kasir)
+            // Set ComboBox berdasarkan nilai 0 (Admin) atau 1 (Kasir)
             Integer hakAksesVal = p.getHakAkses();
             if (hakAksesVal != null && hakAksesVal == 1) {
                 cmbHakAkses.setSelectedItem("Kasir");
@@ -210,7 +208,7 @@ public class tambahdatapengguna extends JPanel {
         String jabatan = txtJabatan.getText().trim();
         String namaLengkap = txtNamaLengkap.getText().trim();
         
-        // [FIX] Ambil nilai String dari ComboBox
+        // Ambil nilai String dari ComboBox
         String hakAksesStr = (String) cmbHakAkses.getSelectedItem(); 
         
         String email = txtEmail.getText().trim();
@@ -221,14 +219,13 @@ public class tambahdatapengguna extends JPanel {
             return;
         }
 
-        // [FIX] Konversi String ("Admin"/"Kasir") ke Integer (0/1)
+        // Konversi String ("Admin"/"Kasir") ke Integer (0/1)
         Integer hakAkses;
         if ("Kasir".equals(hakAksesStr)) {
             hakAkses = 1;
         } else {
             hakAkses = 0; // Default ke Admin
         }
-        // [FIX] Hapus blok try-catch NumberFormat
 
         Pengguna p = new Pengguna();
         p.setUsername(username);
@@ -260,6 +257,31 @@ public class tambahdatapengguna extends JPanel {
             JOptionPane.showMessageDialog(this, "Gagal menyimpan pengguna:\n" + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+
+    // ============================================================
+    // [BARU] HELPER METHOD UNTUK IMAGE (HYBRID EXE/NETBEANS)
+    // ============================================================
+    private ImageIcon loadTopImage(String fileName) {
+        // 1. CARA EXE: Cek folder luar "icon/" di folder instalasi
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            return new ImageIcon(pathDisk);
+        }
+
+        // 2. CARA NETBEANS: Cek resource internal "/Images/"
+        // Perhatikan path package-nya "/Images/" sesuai kodingan awalmu
+        java.net.URL url = getClass().getResource("/Images/" + fileName);
+        if (url != null) {
+            return new ImageIcon(url);
+        }
+
+        // 3. Gagal total
+        System.err.println("Gambar header tidak ditemukan (Disk/Res): " + fileName);
+        return null; // setIcon(null) aman
+    }
+    // ============================================================
 
     // === Rounded TextField & Button (preserve style) ===
     class RoundedTextField extends JTextField {

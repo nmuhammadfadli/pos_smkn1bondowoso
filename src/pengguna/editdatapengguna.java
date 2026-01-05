@@ -2,17 +2,15 @@ package pengguna;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File; // [PENTING] Tambahan import untuk cek file di luar JAR
 import java.sql.SQLException;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-// [FIX] Tambahkan import untuk UI kustom
 import javax.swing.plaf.basic.BasicComboBoxUI;
 import javax.swing.DefaultListCellRenderer;
 
 /**
- * editdatapengguna - versi fungsional tanpa mengubah desain.
- * Hak akses sekarang dropdown: 0 = Admin, 1 = Kasir
- * [FIX] Dropdown (JComboBox) distilasi agar rounded.
+ * editdatapengguna - versi fungsional dengan pemanggilan gambar Hybrid.
  */
 public class editdatapengguna extends JPanel {
 
@@ -23,7 +21,7 @@ public class editdatapengguna extends JPanel {
     private RoundedTextField fldAlamat;
     private RoundedTextField fldJabatan;
     private RoundedTextField fldNamaLengkap;
-    private RoundedComboBox<String> cmbHakAkses;  // [FIX] Diganti ke RoundedComboBox
+    private RoundedComboBox<String> cmbHakAkses;
     private RoundedTextField fldEmail;
     private RoundedTextField fldNotelp;
 
@@ -48,7 +46,11 @@ public class editdatapengguna extends JPanel {
 
         JLabel imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        imageLabel.setIcon(new ImageIcon(getClass().getResource("/Images/pengguna.png")));
+        
+        // [UBAH DI SINI] Gunakan helper method hybrid
+        // Pastikan di Inno Setup, file "pengguna.png" dari folder "Images" 
+        // ikut dicopy ke folder "{app}\icon" (atau sesuaikan path di helper di bawah)
+        imageLabel.setIcon(loadTopImage("pengguna.png"));
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
@@ -74,7 +76,7 @@ public class editdatapengguna extends JPanel {
         fldJabatan = addField(formPanel, gbc, 4, "Jabatan:");
         fldNamaLengkap = addField(formPanel, gbc, 5, "Nama Lengkap:");
         // Hak Akses: gantikan text field dengan combo box (tetap di posisi grid yang sama)
-        addHakAksesField(formPanel, gbc, 6, "Hak Akses:"); // [FIX] Method ini diubah
+        addHakAksesField(formPanel, gbc, 6, "Hak Akses:"); 
         fldEmail = addField(formPanel, gbc, 7, "Email:");
         fldNotelp = addField(formPanel, gbc, 8, "No. Telp:");
 
@@ -139,7 +141,6 @@ public class editdatapengguna extends JPanel {
         return field;
     }
 
-    // [FIX] Method ini diubah untuk menggunakan RoundedComboBox
     private void addHakAksesField(JPanel panel, GridBagConstraints gbc, int gridx, String labelText) {
         int row = gridx / 3;
         int col = gridx % 3;
@@ -152,9 +153,7 @@ public class editdatapengguna extends JPanel {
         JLabel label = new JLabel(labelText);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
-        // [FIX] Ganti JComboBox standar dengan RoundedComboBox
         cmbHakAkses = new RoundedComboBox<>(new String[] {"Admin (0)", "Kasir (1)"});
-        // Atur tinggi agar konsisten (TextField kustom Anda tingginya sekitar 38px)
         cmbHakAkses.setPreferredSize(new Dimension(0, 38)); 
 
         fieldPanel.add(label, BorderLayout.NORTH);
@@ -165,7 +164,6 @@ public class editdatapengguna extends JPanel {
 
     private void loadFromContext() {
         String editingId = PenggunaContext.editingId;
-        // clear fields first
         fldId.setText("");
         fldUsername.setText("");
         fldPassword.setText("");
@@ -194,7 +192,6 @@ public class editdatapengguna extends JPanel {
             fldAlamat.setText(p.getAlamat());
             fldJabatan.setText(p.getJabatan());
             fldNamaLengkap.setText(p.getNamaLengkap());
-            // map integer hak akses -> combo index (0->Admin, 1->Kasir). default ke Admin jika null/unknown.
             Integer ha = p.getHakAkses();
             if (ha == null || ha == 0) cmbHakAkses.setSelectedIndex(0);
             else cmbHakAkses.setSelectedIndex(1);
@@ -225,11 +222,9 @@ public class editdatapengguna extends JPanel {
             return;
         }
 
-        // map combo -> integer hak akses
         Integer hakAkses = 0;
         if (cmbHakAkses != null) {
             int idx = cmbHakAkses.getSelectedIndex();
-            // idx 0 -> Admin (0), idx 1 -> Kasir (1)
             hakAkses = (idx == 1) ? 1 : 0;
         }
 
@@ -245,7 +240,6 @@ public class editdatapengguna extends JPanel {
         p.setNotelpPengguna(notelp);
 
         try {
-            // update
             dao.update(p);
             JOptionPane.showMessageDialog(this, "✅ Data pengguna berhasil diedit!", "Sukses", JOptionPane.INFORMATION_MESSAGE);
             PenggunaContext.editingId = null;
@@ -256,7 +250,34 @@ public class editdatapengguna extends JPanel {
         }
     }
 
-    // === Rounded TextField (Tidak berubah) ===
+    // ============================================================
+    // [BARU] HELPER METHOD UNTUK IMAGE (HYBRID EXE/NETBEANS)
+    // ============================================================
+    private ImageIcon loadTopImage(String fileName) {
+        // 1. CARA EXE: Cek folder luar "icon/" di folder instalasi
+        // Asumsi: di Inno Setup, kamu menaruh semua gambar (termasuk dari folder Images) ke dalam folder "{app}\icon"
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            return new ImageIcon(pathDisk);
+        }
+
+        // 2. CARA NETBEANS: Cek resource internal "/Images/"
+        // Perhatikan path package-nya "/Images/" sesuai kodingan awalamu
+        java.net.URL url = getClass().getResource("/Images/" + fileName);
+        if (url != null) {
+            return new ImageIcon(url);
+        }
+
+        // 3. Gagal total
+        System.err.println("Gambar header tidak ditemukan (Disk/Res): " + fileName);
+        return null; // setIcon(null) aman, tidak bikin crash
+    }
+    // ============================================================
+
+
+    // === Rounded TextField ===
     class RoundedTextField extends JTextField {
         private int radius = 15;
         public RoundedTextField(int size) {
@@ -277,7 +298,7 @@ public class editdatapengguna extends JPanel {
         }
     }
 
-    // === Rounded Button (Tidak berubah) ===
+    // === Rounded Button ===
     class RoundedButton extends JButton {
         private final Color backgroundColor;
         private final Color textColor;
@@ -312,98 +333,64 @@ public class editdatapengguna extends JPanel {
     }
     
     // =======================================================
-    // [BARU] KELAS-KELAS UNTUK STILASI JCOMBOBOX
+    // KELAS-KELAS UNTUK STILASI JCOMBOBOX
     // =======================================================
-
-    /**
-     * 1. JComboBox Kustom
-     * Mengganti paintComponent agar latar belakangnya bulat putih.
-     */
     class RoundedComboBox<E> extends JComboBox<E> {
         private int radius = 15;
-
         public RoundedComboBox(E[] items) {
             super(items);
             setOpaque(false);
-            setUI(new RoundedComboBoxUI()); // Terapkan UI kustom (untuk panah)
-            setRenderer(new RoundedListCellRenderer()); // Terapkan renderer kustom (untuk daftar popup)
-            setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0)); // Padding teks di dalam
-            setBackground(Color.WHITE); // Latar belakang
+            setUI(new RoundedComboBoxUI()); 
+            setRenderer(new RoundedListCellRenderer()); 
+            setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0)); 
+            setBackground(Color.WHITE); 
             setFont(new Font("Segoe UI", Font.PLAIN, 14));
         }
-
         @Override
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            
-            // Gambar latar belakang bulat putih
             g2.setColor(getBackground());
             g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
-            
-            // Gambar border abu-abu
             g2.setColor(new Color(200, 200, 200));
             g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
-            
             g2.dispose();
-            
-            // Penting: Panggil super.paintComponent setelahnya agar teks dll
-            // ter-render di atas latar belakang kustom kita.
-            // Tapi kita nonaktifkan setOpaque agar super tidak menimpa bg kita.
             super.paintComponent(g);
         }
     }
 
-    /**
-     * 2. UI ComboBox Kustom
-     * Mengganti tombol panah standar.
-     */
     class RoundedComboBoxUI extends BasicComboBoxUI {
-        
         @Override
         protected JButton createArrowButton() {
-            // Buat tombol flat sederhana dengan ikon panah
-            JButton button = new JButton("▼"); // Anda bisa ganti dengan icon jika mau
-            button.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 10)); // Padding kanan
+            JButton button = new JButton("▼"); 
+            button.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 10)); 
             button.setContentAreaFilled(false);
             button.setFocusPainted(false);
-            button.setForeground(new Color(100, 100, 100)); // Warna panah
+            button.setForeground(new Color(100, 100, 100)); 
             return button;
         }
-
-        // Hapus latar belakang default (karena RoundedComboBox sudah mengecatnya)
         @Override
         public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
-            // Biarkan kosong
         }
-        
-        // Pastikan border tidak digambar oleh UI delegate
         @Override
         protected Insets getInsets() {
             return new Insets(0, 0, 0, 0); 
         }
     }
 
-    /**
-     * 3. Renderer Daftar Kustom
-     * Mengganti tampilan item di dalam daftar popup.
-     */
     class RoundedListCellRenderer extends DefaultListCellRenderer {
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value,
-                                                    int index, boolean isSelected,
-                                                    boolean cellHasFocus) {
-            // Panggil super untuk mendapatkan JLabel standar
+                                                      int index, boolean isSelected,
+                                                      boolean cellHasFocus) {
             JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-            
             label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-            label.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12)); // Padding item
-
+            label.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12)); 
             if (isSelected) {
-                label.setBackground(new Color(90, 150, 255)); // Warna saat dipilih
+                label.setBackground(new Color(90, 150, 255)); 
                 label.setForeground(Color.WHITE);
             } else {
-                label.setBackground(Color.WHITE); // Warna normal
+                label.setBackground(Color.WHITE); 
                 label.setForeground(new Color(40, 40, 40));
             }
             return label;

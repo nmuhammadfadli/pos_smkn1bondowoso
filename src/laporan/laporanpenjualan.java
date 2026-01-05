@@ -37,6 +37,7 @@ public class laporanpenjualan extends JPanel {
     private JLabel lblJumlahTransaksiValue;
     private JLabel lblBarangTerjualValue;
     private JLabel lblLabaValue;
+    private JLabel lblDonasiValue;
 
     public laporanpenjualan() {
         setLayout(new BorderLayout());
@@ -122,6 +123,9 @@ public class laporanpenjualan extends JPanel {
 
         JPanel pLaba = createSummaryPanelWithLabel("Laba Transaksi", "Rp " + moneyFmt.format(0), new Color(255, 167, 38));
         lblLabaValue = findValueLabelInSummary(pLaba);
+        
+         JPanel pDonasi = createSummaryPanelWithLabel("Total Donasi", "Rp " + moneyFmt.format(0), new Color(103, 58, 183));
+        lblDonasiValue = findValueLabelInSummary(pDonasi);
 
         right.add(pTotal);
         right.add(Box.createVerticalStrut(15));
@@ -131,7 +135,8 @@ public class laporanpenjualan extends JPanel {
         right.add(Box.createVerticalStrut(15));
         right.add(pLaba); // gunakan panel baru
         right.add(Box.createVerticalStrut(15));
-
+        right.add(pDonasi);
+        right.add(Box.createVerticalStrut(15));
         main.add(left, BorderLayout.CENTER);
         main.add(right, BorderLayout.EAST);
         add(main, BorderLayout.CENTER);
@@ -235,27 +240,46 @@ public class laporanpenjualan extends JPanel {
 private void updateSummary(List<TransactionRecord> transactions) {
     try {
         BigDecimal totalPendapatan = BigDecimal.ZERO;
-        BigDecimal totalLaba = BigDecimal.ZERO; // <-- total laba semua transaksi
+        BigDecimal totalLaba = BigDecimal.ZERO;
+        BigDecimal totalDonasi = BigDecimal.ZERO;
         int jumlahTrans = transactions.size();
         long totalBarangTerjual = 0;
 
         for (TransactionRecord tr : transactions) {
-            if (tr.getTotalHarga() != null) totalPendapatan = totalPendapatan.add(tr.getTotalHarga());
+            String pm = tr.getPaymentMethod() == null ? "" : tr.getPaymentMethod().trim().toUpperCase();
+
+            // --- Hitung total pendapatan dan laba hanya untuk CASH atau CREDIT ---
+            boolean includeRevenueAndProfit = "CASH".equals(pm) || "CREDIT".equals(pm);
+
+            if (includeRevenueAndProfit) {
+                if (tr.getTotalHarga() != null) totalPendapatan = totalPendapatan.add(tr.getTotalHarga());
+            }
+
+            // --- Hitung donasi: pakai total_bayar jika ada, kalau 0 gunakan total_harga sebagai fallback ---
+            if (pm.startsWith("DON")) {
+                BigDecimal tb = tr.getTotalBayar() == null ? BigDecimal.ZERO : tr.getTotalBayar();
+                if (tb.compareTo(BigDecimal.ZERO) > 0) {
+                    totalDonasi = totalDonasi.add(tb);
+                } else {
+                    BigDecimal th = tr.getTotalHarga() == null ? BigDecimal.ZERO : tr.getTotalHarga();
+                    totalDonasi = totalDonasi.add(th);
+                }
+            }
+
+            // Barang terjual & laba: laba hanya dihitung untuk CASH/CREDIT
             try {
                 List<TransactionItem> items = txDao.findItemsByTransaction(tr.getIdTransaksi());
                 for (TransactionItem it : items) {
-                    // jumlah terjual
+                    // jumlah terjual (tetap hitung dari semua transaksi)
                     totalBarangTerjual += it.getJumlahBarang();
 
-                    // ambil harga jual dan harga beli (fallback ke ZERO jika null)
-                    BigDecimal hargaUnit = it.getHargaUnit() == null ? BigDecimal.ZERO : it.getHargaUnit();
-                    BigDecimal hargaBeli = it.getHargaBeli() == null ? BigDecimal.ZERO : it.getHargaBeli();
-
-                    // laba per item = (hargaUnit - hargaBeli) * qty
-                    BigDecimal qty = BigDecimal.valueOf(it.getJumlahBarang());
-                    BigDecimal labaPerItem = hargaUnit.subtract(hargaBeli).multiply(qty);
-
-                    totalLaba = totalLaba.add(labaPerItem);
+                    if (includeRevenueAndProfit) {
+                        BigDecimal hargaUnit = it.getHargaUnit() == null ? BigDecimal.ZERO : it.getHargaUnit();
+                        BigDecimal hargaBeli = it.getHargaBeli() == null ? BigDecimal.ZERO : it.getHargaBeli();
+                        BigDecimal qty = BigDecimal.valueOf(it.getJumlahBarang());
+                        BigDecimal labaPerItem = hargaUnit.subtract(hargaBeli).multiply(qty);
+                        totalLaba = totalLaba.add(labaPerItem);
+                    }
                 }
             } catch (Exception ignore) { }
         }
@@ -264,14 +288,20 @@ private void updateSummary(List<TransactionRecord> transactions) {
         lblJumlahTransaksiValue.setText(String.valueOf(jumlahTrans));
         lblBarangTerjualValue.setText(String.valueOf(totalBarangTerjual));
         lblLabaValue.setText("Rp " + moneyFmt.format(totalLaba.longValue()));
+        if (lblDonasiValue != null) {
+            lblDonasiValue.setText("Rp " + moneyFmt.format(totalDonasi.longValue()));
+        }
 
     } catch (Exception ex) {
         lblTotalPendapatanValue.setText("Rp 0");
         lblJumlahTransaksiValue.setText("0");
         lblBarangTerjualValue.setText("0");
         lblLabaValue.setText("Rp 0");
+        if (lblDonasiValue != null) lblDonasiValue.setText("Rp 0");
     }
 }
+
+
 
 
     // Show modal dialog listing items for given transaction id

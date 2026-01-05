@@ -1,29 +1,293 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE jasperReport PUBLIC "-//JasperReports//DTD JasperReport//EN" "http://jasperreports.sourceforge.net/dtds/jasperreport.dtd">
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+    name="reportPenjualan"
+    pageWidth="227" pageHeight="2000"
+    columnWidth="199"
+    leftMargin="14" rightMargin="14" topMargin="10" bottomMargin="10"
+    isIgnorePagination="true"
+    uuid="29af9f28-3b62-4a98-bc23-8a5d37c39f25">
 
-<jasperReport name="report name" pageWidth="595" pageHeight="842" columnWidth="535" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
-    <background>
-        <band/>
-    </background>
-    <title>
-        <band height="79"/>
-    </title>
-    <pageHeader>
-        <band height="35"/>
-    </pageHeader>
-    <columnHeader>
-        <band height="61"/>
-    </columnHeader>
-    <detail>
-        <band height="125"/>
-    </detail>
-    <columnFooter>
-        <band height="45"/>
-    </columnFooter>
-    <pageFooter>
-        <band height="54"/>
-    </pageFooter>
-    <summary>
-        <band height="42"/>
-    </summary>
+	<parameter name="kode_transaksi" class="java.lang.String"/>
+	<queryString>
+		<![CDATA[SELECT
+  tp.kode_transaksi,
+  tp.tgl_transaksi,
+  dp.nama_lengkap AS nama_kasir,
+  tp.payment_method,
+  COALESCE(tp.total_harga, 0) AS total_harga,
+  COALESCE(tp.total_bayar, 0) AS total_bayar,
+  COALESCE(tp.kembalian, 0) AS kembalian,
+  d.id_detail_penjualan,
+  d.id_detail_barang,
+  COALESCE(db.barcode, '') AS barcode,
+  COALESCE(b.nama, '') AS nama_barang,
+  COALESCE(d.jumlah_barang, 0) AS jumlah_barang,
+  COALESCE(d.harga_unit, 0) AS harga_unit,
+  COALESCE(d.subtotal, 0) AS subtotal
+FROM transaksi_penjualan tp
+LEFT JOIN data_pengguna dp ON tp.id_pengguna = dp.id_pengguna
+JOIN detail_penjualan d ON d.id_transaksi = tp.id_transaksi
+LEFT JOIN detail_barang db ON d.id_detail_barang = db.id_detail_barang
+LEFT JOIN barang b ON db.id_barang = b.id
+WHERE tp.kode_transaksi = $P{kode_transaksi}
+ORDER BY d.id_detail_penjualan]]>
+	</queryString>
+	<field name="kode_transaksi" class="java.lang.String"/>
+	<field name="tgl_transaksi" class="java.lang.String"/>
+	<field name="nama_kasir" class="java.lang.String"/>
+	<field name="payment_method" class="java.lang.String"/>
+	<field name="total_harga" class="java.lang.Integer"/>
+	<field name="total_bayar" class="java.lang.Integer"/>
+	<field name="kembalian" class="java.lang.Integer"/>
+	<field name="id_detail_penjualan" class="java.lang.Integer"/>
+	<field name="id_detail_barang" class="java.lang.Integer"/>
+	<field name="barcode" class="java.lang.String"/>
+	<field name="nama_barang" class="java.lang.String"/>
+	<field name="jumlah_barang" class="java.lang.Integer"/>
+	<field name="harga_unit" class="java.lang.Integer"/>
+	<field name="subtotal" class="java.lang.Integer"/>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+
+	<!-- TITLE (adjusted widths to 199 total) -->
+	<title>
+		<band height="88" splitType="Stretch">
+			<staticText>
+				<reportElement x="0" y="4" width="199" height="22" uuid="471de876-be8f-405c-88da-c60711d89909"/>
+				<textElement textAlignment="Center">
+					<font size="14" isBold="true"/>
+				</textElement>
+				<text><![CDATA[BTC SMAKENSA]]></text>
+			</staticText>
+
+			<!-- Alamat dan telepon dipisah dua baris, font sedikit dikecilkan agar pasti muat -->
+			<staticText>
+				<reportElement x="0" y="28" width="199" height="12"/>
+				<textElement textAlignment="Center">
+					<font size="8"/>
+				</textElement>
+				<text><![CDATA[JL. HOS COKROAMINOTO NO. 110]]></text>
+			</staticText>
+
+			<staticText>
+				<reportElement x="0" y="40" width="199" height="12"/>
+				<textElement textAlignment="Center">
+					<font size="8"/>
+				</textElement>
+				<text><![CDATA[Telp. 0813-2552-5125]]></text>
+			</staticText>
+
+			<!-- Kode (left) -->
+			<textField>
+				<reportElement x="0" y="56" width="100" height="12" uuid="d176527a-8bee-42c1-8780-efee5547ad41"/>
+				<textElement>
+					<font size="9"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Kode: " + $F{kode_transaksi}]]></textFieldExpression>
+			</textField>
+
+			<!-- Tanggal (right) -->
+			<textField>
+				<reportElement x="100" y="56" width="99" height="12" uuid="922725ce-60a5-4cea-8d08-2d44e00ccd7c"/>
+				<textElement textAlignment="Right">
+					<font size="9"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Tanggal: " + $F{tgl_transaksi}]]></textFieldExpression>
+			</textField>
+
+			<!-- Kasir (left) -->
+			<textField>
+				<reportElement x="0" y="70" width="100" height="12" uuid="42211604-c200-48dd-8870-8dfa1e2acacd"/>
+				<textElement>
+					<font size="9"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Kasir: " + ($F{nama_kasir} == null ? "" : $F{nama_kasir})]]></textFieldExpression>
+			</textField>
+
+			<!-- Payment (right) -->
+			<textField>
+				<reportElement x="100" y="70" width="99" height="12" uuid="e9ea899f-ace6-426a-ade3-25ddfcec8eb3"/>
+				<textElement textAlignment="Right">
+					<font size="9"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Payment: " + ($F{payment_method} == null ? "CASH" : $F{payment_method})]]></textFieldExpression>
+			</textField>
+		</band>
+	</title>
+
+	<!-- COLUMN HEADER with top and bottom separator lines -->
+	<columnHeader>
+		<band height="26" splitType="Stretch">
+			<!-- top separator -->
+			<line>
+				<reportElement x="0" y="0" width="199" height="1"/>
+			</line>
+
+			<!-- Header labels shifted a bit down to make room for top line -->
+			<staticText>
+				<reportElement x="0" y="3" width="93" height="18" uuid="45c7460e-e100-4509-92b6-4f0c8e348619"/>
+				<textElement>
+					<font size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Nama Barang]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="93" y="3" width="22" height="18" uuid="f7547565-848a-4bc8-92a5-868e4277926b"/>
+				<textElement textAlignment="Right">
+					<font size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Qty]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="115" y="3" width="41" height="18" uuid="40edbb6b-4274-4fd0-bdb1-7f5c9dae776e"/>
+				<textElement textAlignment="Right">
+					<font size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Harga Unit]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="156" y="3" width="43" height="18" uuid="548d0eb5-0c6e-402e-8e6c-60429aa8f99c"/>
+				<textElement textAlignment="Right">
+					<font size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Subtotal]]></text>
+			</staticText>
+
+			<!-- bottom separator -->
+			<line>
+				<reportElement x="0" y="25" width="199" height="1"/>
+			</line>
+		</band>
+	</columnHeader>
+
+	<!-- DETAIL (adjusted widths & font sizes for numeric values) -->
+	<detail>
+		<band height="20" splitType="Stretch">
+			<!-- Item name (wrap allowed) -->
+			<textField isStretchWithOverflow="true">
+				<reportElement x="0" y="0" width="93" height="20" uuid="895d5a4a-f82a-4640-8e59-f0fea9bc53ad"/>
+				<textElement>
+					<font size="9"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{nama_barang} == null || $F{nama_barang}.trim().isEmpty() ? $F{barcode} : $F{nama_barang}]]></textFieldExpression>
+			</textField>
+
+			<!-- Qty (numeric value font slightly larger) -->
+			<textField>
+				<reportElement x="93" y="0" width="22" height="20" uuid="04274a32-9e9e-4726-bb16-31693de7eadd"/>
+				<textElement textAlignment="Right">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{jumlah_barang}]]></textFieldExpression>
+			</textField>
+
+			<!-- Unit price (numeric - font increased) -->
+			<textField pattern="#,##0">
+				<reportElement x="115" y="0" width="41" height="20" uuid="e2943d47-0dc8-45d4-970a-f963d31e64da"/>
+				<textElement textAlignment="Right">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{harga_unit} == null ? new java.math.BigDecimal("0") : $F{harga_unit}]]></textFieldExpression>
+			</textField>
+
+			<!-- Subtotal (numeric - font increased) -->
+			<textField pattern="#,##0">
+				<reportElement x="156" y="0" width="43" height="20" uuid="8851e5d0-e985-4f0c-bc7e-84ee8e157028"/>
+				<textElement textAlignment="Right">
+					<font size="10"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{subtotal} == null ? new java.math.BigDecimal("0") : $F{subtotal}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+
+	<!-- PAGE FOOTER (adjusted) -->
+	<pageFooter>
+		<band height="30" splitType="Stretch">
+			<staticText>
+				<reportElement x="0" y="6" width="120" height="18" uuid="c1ec4b32-deff-4586-9d48-2888d21dede4"/>
+				<textElement textAlignment="Left">
+					<font size="8"/>
+				</textElement>
+				<text><![CDATA[Powered by POS Smakensa]]></text>
+			</staticText>
+
+			<textField pattern="yyyy-MM-dd HH:mm">
+				<reportElement x="120" y="6" width="79" height="18" uuid="336cba22-3a2e-4926-8f9a-a50648927c5f"/>
+				<textElement textAlignment="Right">
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[new java.util.Date()]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+
+	<!-- SUMMARY (totals) - layout fitted to width 199; numeric values use larger font -->
+	<summary>
+		<band height="140" splitType="Stretch">
+			<line>
+				<reportElement x="0" y="0" width="199" height="1" uuid="a26a504e-102b-46d1-8820-874e6e2c8af7"/>
+			</line>
+
+			<!-- TOTAL label / value -->
+			<staticText>
+				<reportElement x="100" y="6" width="49" height="18" uuid="43c262fc-b6c2-4c2c-9efd-1727073d76e9"/>
+				<textElement textAlignment="Right">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[TOTAL:]]></text>
+			</staticText>
+			<textField pattern="#,##0">
+				<reportElement x="149" y="6" width="50" height="18" uuid="2c3b5c6c-55c5-425b-b529-20cd17b50daa"/>
+				<textElement textAlignment="Right">
+					<font size="12" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{total_harga} == null ? new java.math.BigDecimal("0") : $F{total_harga}]]></textFieldExpression>
+			</textField>
+
+			<!-- PAID label / value -->
+			<staticText>
+				<reportElement x="100" y="32" width="49" height="18" uuid="6d5e1bdb-ea4d-4c2c-84dd-74ded82b0029"/>
+				<textElement textAlignment="Right">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[TUNAI:]]></text>
+			</staticText>
+			<textField pattern="#,##0">
+				<reportElement x="149" y="32" width="50" height="18" uuid="eef9bd27-1caa-4df8-b8f4-5da85cf3e7ce"/>
+				<textElement textAlignment="Right">
+					<font size="11" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{total_bayar} == null ? new java.math.BigDecimal("0") : $F{total_bayar}]]></textFieldExpression>
+			</textField>
+
+			<!-- CHANGE label / value -->
+			<staticText>
+				<reportElement x="100" y="58" width="49" height="18" uuid="913863ce-2eb0-4d86-8d61-470d25e0d682"/>
+				<textElement textAlignment="Right">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[KEMBALI:]]></text>
+			</staticText>
+			<textField pattern="#,##0">
+				<reportElement x="149" y="58" width="50" height="18" uuid="a1497db8-624b-46ea-9094-71e03b3cd024"/>
+				<textElement textAlignment="Right">
+					<font size="11" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{kembalian} == null ? new java.math.BigDecimal("0") : $F{kembalian}]]></textFieldExpression>
+			</textField>
+
+			<!-- footer note as a single wrapping textField to avoid overflow -->
+			<textField isStretchWithOverflow="true">
+				<reportElement x="0" y="86" width="199" height="40"/>
+				<textElement textAlignment="Center">
+					<font size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Terima kasih atas kunjungan Anda. Barang yang sudah dibeli tidak bisa dikembalikan tanpa nota."]]></textFieldExpression>
+			</textField>
+		</band>
+	</summary>
 </jasperReport>

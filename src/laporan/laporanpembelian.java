@@ -26,7 +26,6 @@ public class laporanpembelian extends JPanel {
     private JLabel lblTotalPengeluaranValue;
     private JLabel lblJumlahPembelianValue;
     private JLabel lblBarangDibeliValue;
-    private JLabel lblRataRataValue;
 
     // [PERUBAHAN 1] Pindahkan model dan tabel ke sini agar bisa diakses
     // oleh fungsi helper baru (loadTodayData)
@@ -136,11 +135,6 @@ public class laporanpembelian extends JPanel {
         rightPanel.add(pBarang);
         rightPanel.add(Box.createVerticalStrut(15));
 
-        JPanel pRata = createSummaryPanelWithLabel("Rata-rata Pembelian", "Rp " + df.format(0), new Color(255, 167, 38));
-        lblRataRataValue = findValueLabelInSummary(pRata);
-
-        rightPanel.add(pRata);
-        rightPanel.add(Box.createVerticalStrut(15));
 
         // ===== Gabungkan kiri dan kanan =====
         mainPanel.add(leftPanel, BorderLayout.CENTER);
@@ -283,10 +277,6 @@ public class laporanpembelian extends JPanel {
             lblJumlahPembelianValue.setText(String.valueOf(jumlahPembelian));
             lblBarangDibeliValue.setText(String.valueOf(jumlahBarangDibeli));
 
-            if (jumlahPembelian > 0)
-                lblRataRataValue.setText("Rp " + df.format(totalPengeluaran / jumlahPembelian));
-            else
-                lblRataRataValue.setText("Rp " + df.format(0));
 
         } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this,

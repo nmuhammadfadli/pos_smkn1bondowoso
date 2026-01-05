@@ -5,15 +5,15 @@ import java.awt.*;
 import java.awt.event.*;
 import java.sql.*;
 import java.util.Objects;
+import java.io.File; // [PENTING] Tambahan import
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
 import Helper.DatabaseHelper;
 
 /**
- * Desain persis seperti yang kamu minta.
- * Fungsional: terhubung ke BarangDAO, support tambah + edit (via BarangContext.editingId),
- * PilihKategoriFrame membaca data_kategori dari DB, onSave insert/update lewat BarangDAO.
+ * tambahdatabarang - Desain persis, Fungsionalitas Insert/Update.
+ * Pemanggilan gambar diperbaiki (Hybrid) agar jalan di EXE.
  */
 public class tambahdatabarang extends JPanel {
     private JTextField txtId, txtNama, txtKategori;
@@ -24,7 +24,6 @@ public class tambahdatabarang extends JPanel {
             barangDao = new BarangDAO();
         } catch (Exception ex) {
             barangDao = null;
-            // jangan ganggu desain — hanya log/alert
             JOptionPane.showMessageDialog(this, "Peringatan: gagal inisialisasi BarangDAO:\n" + ex.getMessage(), "DB Warning", JOptionPane.WARNING_MESSAGE);
         }
 
@@ -39,7 +38,9 @@ public class tambahdatabarang extends JPanel {
 
         JLabel imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        imageLabel.setIcon(new ImageIcon(getClass().getResource("/Icon/tambahbarang.png"))); // ganti sesuai path
+        
+        // [UBAH DI SINI] Gunakan helper method hybrid
+        imageLabel.setIcon(loadTopImage("tambahbarang.png")); 
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
@@ -206,6 +207,31 @@ public class tambahdatabarang extends JPanel {
             JOptionPane.showMessageDialog(this, "Gagal menyimpan barang:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+
+    // ============================================================
+    // [BARU] HELPER METHOD UNTUK IMAGE (HYBRID EXE/NETBEANS)
+    // ============================================================
+    private ImageIcon loadTopImage(String fileName) {
+        // 1. CARA EXE: Cek folder luar "icon/"
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            return new ImageIcon(pathDisk);
+        }
+
+        // 2. CARA NETBEANS: Cek resource internal "/Icon/"
+        // Perhatikan path package-nya "/Icon/" sesuai kodingan awalmu
+        java.net.URL url = getClass().getResource("/Icon/" + fileName);
+        if (url != null) {
+            return new ImageIcon(url);
+        }
+
+        // 3. Gagal total
+        System.err.println("Gambar header tidak ditemukan (Disk/Res): " + fileName);
+        return null;
+    }
+    // ============================================================
 
     // PilihKategoriFrame membaca kategori dari DB (preserve desain)
     class PilihKategoriFrame extends JFrame {

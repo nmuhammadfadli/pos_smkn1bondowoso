@@ -17,156 +17,198 @@ public class TransactionDAO {
     /**
      * Proses penjualan secara atomik
      */
-    public void processSale(List<SaleItem> items, Integer voucherId, BigDecimal cashPaid, 
-                            String kodeTrans, String idPengguna) throws Exception {
-        if (items == null || items.isEmpty()) {
-            throw new IllegalArgumentException("Tidak ada item transaksi.");
-        }
-        if (cashPaid == null) cashPaid = BigDecimal.ZERO;
+ // ubah signature: return long (idTransaksi)
+public long processSale(List<SaleItem> items, Integer voucherId, BigDecimal cashPaid,
+                        String kodeTransCandidate, String idPengguna, String paymentMethodParam) throws Exception {
 
-        // validasi awal
-        for (SaleItem it : items) {
-            if (it == null) throw new IllegalArgumentException("Item transaksi null.");
-            if (it.getQty() <= 0) throw new IllegalArgumentException("Qty harus > 0 untuk idDetailBarang=" + it.getIdDetailBarang());
-            if (it.getPrice() == null) throw new IllegalArgumentException("Harga null untuk idDetailBarang=" + it.getIdDetailBarang());
-        }
+    if (items == null || items.isEmpty()) {
+        throw new IllegalArgumentException("Tidak ada item transaksi.");
+    }
+    if (cashPaid == null) cashPaid = BigDecimal.ZERO;
 
-        try (Connection conn = DatabaseHelper.getConnection()) {
-            try (Statement s = conn.createStatement()) {
-                s.execute("PRAGMA foreign_keys = ON");
-            } catch (Throwable ignore) {}
+    // validasi awal
+    for (SaleItem it : items) {
+        if (it == null) throw new IllegalArgumentException("Item transaksi null.");
+        if (it.getQty() <= 0) throw new IllegalArgumentException("Qty harus > 0 untuk idDetailBarang=" + it.getIdDetailBarang());
+        if (it.getPrice() == null) throw new IllegalArgumentException("Harga null untuk idDetailBarang=" + it.getIdDetailBarang());
+    }
 
-            conn.setAutoCommit(false);
-            try {
-                // Hitung total harga
-                BigDecimal totalHarga = BigDecimal.ZERO;
+    try (Connection conn = DatabaseHelper.getConnection()) {
+        try (Statement s = conn.createStatement()) {
+            s.execute("PRAGMA foreign_keys = ON");
+        } catch (Throwable ignore) {}
+
+        conn.setAutoCommit(false);
+        try {
+            // Hitung total harga
+            BigDecimal totalHarga = BigDecimal.ZERO;
+            for (SaleItem it : items) {
+                totalHarga = totalHarga.add(it.getPrice().multiply(BigDecimal.valueOf(it.getQty())));
+            }
+
+            // VOUCHER (sama seperti sebelumnya)
+            BigDecimal usedFromVoucher = BigDecimal.ZERO;
+            BigDecimal voucherBalance = BigDecimal.ZERO;
+            if (voucherId != null) {
+                String sel = "SELECT current_balance FROM kode_voucher WHERE id_voucher = ?";
+                try (PreparedStatement ps = conn.prepareStatement(sel)) {
+                    ps.setInt(1, voucherId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            String s = rs.getString("current_balance");
+                            voucherBalance = (s == null || s.trim().isEmpty()) ? BigDecimal.ZERO : new BigDecimal(s);
+                        } else {
+                            throw new SQLException("Voucher dengan id " + voucherId + " tidak ditemukan.");
+                        }
+                    }
+                }
+
+                usedFromVoucher = voucherBalance.min(totalHarga);
+                if (usedFromVoucher.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal newBal = voucherBalance.subtract(usedFromVoucher);
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "UPDATE kode_voucher SET current_balance = ? WHERE id_voucher = ?")) {
+                        ps.setString(1, newBal.toPlainString());
+                        ps.setInt(2, voucherId);
+                        ps.executeUpdate();
+                    }
+                }
+            }
+
+            BigDecimal sisa = totalHarga.subtract(usedFromVoucher);
+            BigDecimal totalBayar = usedFromVoucher.add(cashPaid);
+            BigDecimal kembalian = BigDecimal.ZERO;
+            if (cashPaid.compareTo(sisa) >= 0) {
+                kembalian = cashPaid.subtract(sisa);
+                sisa = BigDecimal.ZERO;
+            } else {
+                sisa = sisa.subtract(cashPaid);
+            }
+
+            String computedPaymentMethod = "CASH";
+            if (usedFromVoucher.compareTo(BigDecimal.ZERO) > 0 && cashPaid.compareTo(BigDecimal.ZERO) == 0)
+                computedPaymentMethod = "VOUCHER";
+            else if (usedFromVoucher.compareTo(BigDecimal.ZERO) > 0 && cashPaid.compareTo(BigDecimal.ZERO) > 0)
+                computedPaymentMethod = "MIX";
+            else if (usedFromVoucher.compareTo(BigDecimal.ZERO) == 0 && cashPaid.compareTo(BigDecimal.ZERO) == 0)
+                computedPaymentMethod = "CREDIT";
+
+            String finalPaymentMethod = (paymentMethodParam != null && !paymentMethodParam.trim().isEmpty())
+                    ? paymentMethodParam.trim().toUpperCase()
+                    : computedPaymentMethod;
+
+            // Jika kode kosong, generate KODE DI SINI (dengan koneksi yang sama) supaya deterministic
+            String kodeToUse = generateKodeTransaksiIfEmpty(conn, kodeTransCandidate);
+
+            // set tgl_transaksi explicit (yyyy-MM-dd)
+            String tglTransaksi = java.time.LocalDate.now().toString();
+
+            // INSERT header (sertakan tgl_transaksi)
+            long idTrans;
+            String insTrans = "INSERT INTO transaksi_penjualan " +
+                    "(kode_transaksi, tgl_transaksi, total_harga, total_bayar, kembalian, payment_method, id_voucher, id_pengguna) " +
+                    "VALUES (?,?,?,?,?,?,?,?)";
+            try (PreparedStatement ps = conn.prepareStatement(insTrans, Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, kodeToUse);
+                ps.setString(2, tglTransaksi); // important: set tanggal
+                ps.setString(3, totalHarga.toPlainString());
+                ps.setString(4, totalBayar.toPlainString());
+                ps.setString(5, kembalian.toPlainString());
+                ps.setString(6, finalPaymentMethod);
+                if (voucherId != null) ps.setInt(7, voucherId);
+                else ps.setNull(7, Types.INTEGER);
+                if (idPengguna != null) ps.setString(8, idPengguna);
+                else ps.setNull(8, Types.VARCHAR);
+                ps.executeUpdate();
+
+                try (ResultSet gk = ps.getGeneratedKeys()) {
+                    if (gk.next()) idTrans = gk.getLong(1);
+                    else throw new SQLException("Gagal mendapatkan id transaksi.");
+                }
+            }
+
+            // INSERT detail + update stok (pakai conn yg sama)
+            String insDetail = "INSERT INTO detail_penjualan " +
+                    "(id_transaksi, id_detail_barang, jumlah_barang, harga_unit, subtotal) VALUES (?,?,?,?,?)";
+            try (PreparedStatement psIns = conn.prepareStatement(insDetail)) {
                 for (SaleItem it : items) {
-                    totalHarga = totalHarga.add(it.getPrice().multiply(BigDecimal.valueOf(it.getQty())));
+                    detailDao.decreaseStock(conn, it.getIdDetailBarang(), it.getQty());
+
+                    BigDecimal subtotal = it.getPrice().multiply(BigDecimal.valueOf(it.getQty()));
+                    psIns.setLong(1, idTrans);
+                    psIns.setInt(2, it.getIdDetailBarang());
+                    psIns.setInt(3, it.getQty());
+                    psIns.setString(4, it.getPrice().toPlainString());
+                    psIns.setString(5, subtotal.toPlainString());
+                    psIns.executeUpdate();
                 }
+            }
 
-                // ============ VOUCHER ============
-                BigDecimal usedFromVoucher = BigDecimal.ZERO;
-                BigDecimal voucherBalance = BigDecimal.ZERO;
-
-                if (voucherId != null) {
-                    String sel = "SELECT current_balance FROM kode_voucher WHERE id_voucher = ?";
-                    try (PreparedStatement ps = conn.prepareStatement(sel)) {
-                        ps.setInt(1, voucherId);
-                        try (ResultSet rs = ps.executeQuery()) {
-                            if (rs.next()) {
-                                String s = rs.getString("current_balance");
-                                voucherBalance = (s == null || s.trim().isEmpty()) ? BigDecimal.ZERO : new BigDecimal(s);
-                            } else {
-                                throw new SQLException("Voucher dengan id " + voucherId + " tidak ditemukan.");
-                            }
-                        }
-                    }
-
-                    usedFromVoucher = voucherBalance.min(totalHarga);
-                    if (usedFromVoucher.compareTo(BigDecimal.ZERO) > 0) {
-                        BigDecimal newBal = voucherBalance.subtract(usedFromVoucher);
-                        try (PreparedStatement ps = conn.prepareStatement(
-                                "UPDATE kode_voucher SET current_balance = ? WHERE id_voucher = ?")) {
-                            ps.setString(1, newBal.toPlainString());
-                            ps.setInt(2, voucherId);
-                            ps.executeUpdate();
-                        }
-                    }
+            // voucher_usage
+            if (usedFromVoucher.compareTo(BigDecimal.ZERO) > 0 && voucherId != null) {
+                String insUsage = "INSERT INTO voucher_usage (id_voucher, id_transaksi, used_amount) VALUES (?,?,?)";
+                try (PreparedStatement ps = conn.prepareStatement(insUsage)) {
+                    ps.setInt(1, voucherId);
+                    ps.setLong(2, idTrans);
+                    ps.setString(3, usedFromVoucher.toPlainString());
+                    ps.executeUpdate();
                 }
+            }
 
-                // ============ HITUNG SISA, BAYAR, KEMBALIAN ============
-                BigDecimal sisa = totalHarga.subtract(usedFromVoucher);
-                BigDecimal totalBayar = usedFromVoucher.add(cashPaid);
-                BigDecimal kembalian = BigDecimal.ZERO;
-                if (cashPaid.compareTo(sisa) >= 0) {
-                    kembalian = cashPaid.subtract(sisa);
-                    sisa = BigDecimal.ZERO;
-                } else {
-                    sisa = sisa.subtract(cashPaid);
-                }
-
-                String paymentMethod = "CASH";
-                if (usedFromVoucher.compareTo(BigDecimal.ZERO) > 0 && cashPaid.compareTo(BigDecimal.ZERO) == 0)
-                    paymentMethod = "VOUCHER";
-                else if (usedFromVoucher.compareTo(BigDecimal.ZERO) > 0 && cashPaid.compareTo(BigDecimal.ZERO) > 0)
-                    paymentMethod = "MIX";
-                else if (usedFromVoucher.compareTo(BigDecimal.ZERO) == 0 && cashPaid.compareTo(BigDecimal.ZERO) == 0)
-                    paymentMethod = "CREDIT";
-
-                // ============ INSERT transaksi_penjualan ============
-                long idTrans;
-                String insTrans = "INSERT INTO transaksi_penjualan " +
-                        "(kode_transaksi, total_harga, total_bayar, kembalian, payment_method, id_voucher, id_pengguna) " +
-                        "VALUES (?,?,?,?,?,?,?)";
-                try (PreparedStatement ps = conn.prepareStatement(insTrans, Statement.RETURN_GENERATED_KEYS)) {
-                    ps.setString(1, kodeTrans);
+            // receivable (piutang)
+            if (sisa.compareTo(BigDecimal.ZERO) > 0 && !"DONASI".equals(finalPaymentMethod)) {
+                String insReceivable = "INSERT INTO receivable " +
+                        "(id_transaksi, amount_total, amount_paid, amount_outstanding, status) VALUES (?,?,?,?,?)";
+                try (PreparedStatement ps = conn.prepareStatement(insReceivable)) {
+                    ps.setLong(1, idTrans);
                     ps.setString(2, totalHarga.toPlainString());
                     ps.setString(3, totalBayar.toPlainString());
-                    ps.setString(4, kembalian.toPlainString());
-                    ps.setString(5, paymentMethod);
-                    if (voucherId != null) ps.setInt(6, voucherId);
-                    else ps.setNull(6, Types.INTEGER);
-                    if (idPengguna != null) ps.setString(7, idPengguna);
-                    else ps.setNull(7, Types.VARCHAR);
+                    ps.setString(4, sisa.toPlainString());
+                    ps.setString(5, "OPEN");
                     ps.executeUpdate();
-
-                    try (ResultSet gk = ps.getGeneratedKeys()) {
-                        if (gk.next()) idTrans = gk.getLong(1);
-                        else throw new SQLException("Gagal mendapatkan id transaksi.");
-                    }
                 }
-
-                // ============ INSERT detail_penjualan & update stok ============
-                String insDetail = "INSERT INTO detail_penjualan " +
-                        "(id_transaksi, id_detail_barang, jumlah_barang, harga_unit, subtotal) VALUES (?,?,?,?,?)";
-                try (PreparedStatement psIns = conn.prepareStatement(insDetail)) {
-                    for (SaleItem it : items) {
-                        detailDao.decreaseStock(conn, it.getIdDetailBarang(), it.getQty());
-
-                        BigDecimal subtotal = it.getPrice().multiply(BigDecimal.valueOf(it.getQty()));
-                        psIns.setLong(1, idTrans);
-                        psIns.setInt(2, it.getIdDetailBarang());
-                        psIns.setInt(3, it.getQty());
-                        psIns.setString(4, it.getPrice().toPlainString());
-                        psIns.setString(5, subtotal.toPlainString());
-                        psIns.executeUpdate();
-                    }
-                }
-
-                // ============ record voucher_usage ============
-                if (usedFromVoucher.compareTo(BigDecimal.ZERO) > 0 && voucherId != null) {
-                    String insUsage = "INSERT INTO voucher_usage (id_voucher, id_transaksi, used_amount) VALUES (?,?,?)";
-                    try (PreparedStatement ps = conn.prepareStatement(insUsage)) {
-                        ps.setInt(1, voucherId);
-                        ps.setLong(2, idTrans);
-                        ps.setString(3, usedFromVoucher.toPlainString());
-                        ps.executeUpdate();
-                    }
-                }
-
-                // ============ buat receivable (piutang) ============
-                if (sisa.compareTo(BigDecimal.ZERO) > 0) {
-                    String insReceivable = "INSERT INTO receivable " +
-                            "(id_transaksi, amount_total, amount_paid, amount_outstanding, status) VALUES (?,?,?,?,?)";
-                    try (PreparedStatement ps = conn.prepareStatement(insReceivable)) {
-                        ps.setLong(1, idTrans);
-                        ps.setString(2, totalHarga.toPlainString());
-                        ps.setString(3, totalBayar.toPlainString());
-                        ps.setString(4, sisa.toPlainString());
-                        ps.setString(5, "OPEN");
-                        ps.executeUpdate();
-                    }
-                }
-
-                conn.commit();
-            } catch (Exception ex) {
-                try { conn.rollback(); } catch (Throwable t) {}
-                throw ex;
-            } finally {
-                try { conn.setAutoCommit(true); } catch (Throwable ignore) {}
             }
+
+            conn.commit();
+            // Kembalikan idTrans (pemanggil dapat memakai id/kode untuk cetak/refresh)
+            return idTrans;
+        } catch (Exception ex) {
+            try { conn.rollback(); } catch (Throwable t) {}
+            throw ex;
+        } finally {
+            try { conn.setAutoCommit(true); } catch (Throwable ignore) {}
         }
     }
+}
+private String generateKodeTransaksiIfEmpty(Connection conn, String candidate) throws SQLException {
+    if (candidate != null && !candidate.trim().isEmpty()) return candidate.trim();
+
+    String prefix = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("ddMMyyyy"));
+    String sql = "SELECT kode_transaksi FROM transaksi_penjualan WHERE kode_transaksi LIKE ? ORDER BY id_transaksi DESC LIMIT 1";
+    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setString(1, prefix + "%");
+        try (ResultSet rs = ps.executeQuery()) {
+            int next = 1;
+            if (rs.next()) {
+                String last = rs.getString(1);
+                if (last != null && last.length() > prefix.length()) {
+                    try {
+                        next = Integer.parseInt(last.substring(prefix.length())) + 1;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            return prefix + String.format("%04d", next);
+        }
+    }
+}
+
+
+  // Overload untuk kompatibilitas: pemanggil lama tetap bisa memakai signature lama.
+public void processSale(List<SaleItem> items, Integer voucherId, BigDecimal cashPaid,
+                        String kodeTrans, String idPengguna) throws Exception {
+    processSale(items, voucherId, cashPaid, kodeTrans, idPengguna, null);
+}
+
 
     /**
      * Ambil semua transaksi (header)

@@ -5,6 +5,7 @@ import pengguna.PenggunaDAO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.File; 
 
 public class LoginDialog extends JDialog {
     private JTextField txtUsername;
@@ -13,12 +14,12 @@ public class LoginDialog extends JDialog {
     private boolean succeeded = false;
     private Pengguna loggedUser = null;
 
-    // --- [UBAH] Warna Desain ---
-    private Color colorBackground = new Color(235, 28, 44);     // Latar form (Merah dari user)
-    private Color colorPrimary = Color.WHITE;                   // Latar logo (Putih)
-    private Color colorText = Color.WHITE;                      // Teks di form (putih di atas merah)
-    private Color colorError = new Color(255, 180, 0);          // Kuning/Oranye untuk error
-    private Color colorButton = new Color(235, 28, 44);         // Merah (untuk teks tombol Login)
+    // --- Warna Desain ---
+    private Color colorBackground = new Color(235, 28, 44);
+    private Color colorPrimary = Color.WHITE;
+    private Color colorText = Color.WHITE;
+    private Color colorError = new Color(255, 180, 0);
+    private Color colorButton = new Color(235, 28, 44);
     
     private Font fontTitle = new Font("SansSerif", Font.BOLD, 28);
     private Font fontLabel = new Font("SansSerif", Font.PLAIN, 14);
@@ -155,7 +156,7 @@ public class LoginDialog extends JDialog {
         return panel;
     }
 
-private JPanel createLogoPanel() {
+    private JPanel createLogoPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(colorPrimary);
 
@@ -181,45 +182,71 @@ private JPanel createLogoPanel() {
         return panel;
     }
 
+    // ============================================================
+    // METODE HYBRID (Jalan di EXE & NetBeans)
+    // ============================================================
     private ImageIcon loadIcon(String fileName, int size) {
-        try {
-            java.net.URL imgURL = getClass().getResource("/icon/" + fileName);
-            if (imgURL == null) {
-                System.err.println("Icon tidak ditemukan: /icon/" + fileName);
-                return createPlaceholderIcon(size);
+        // 1. CARA EXE (Cek folder luar "icon")
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            try {
+                ImageIcon originalIcon = new ImageIcon(pathDisk);
+                if (originalIcon.getImageLoadStatus() == MediaTracker.COMPLETE) {
+                    Image img = originalIcon.getImage().getScaledInstance(size, size, Image.SCALE_SMOOTH);
+                    return new ImageIcon(img);
+                }
+            } catch (Exception e) {
+                System.err.println("Gagal load dari disk: " + e.getMessage());
             }
-            
-            ImageIcon originalIcon = new ImageIcon(imgURL);
-            Image img = originalIcon.getImage().getScaledInstance(size, size, Image.SCALE_SMOOTH);
-            return new ImageIcon(img);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            return createPlaceholderIcon(size);
         }
+
+        // 2. CARA NETBEANS (Cek resource dalam package "/Icon/")
+        java.net.URL url = getClass().getResource("/Icon/" + fileName);
+        if (url != null) {
+            try {
+                ImageIcon originalIcon = new ImageIcon(url);
+                Image img = originalIcon.getImage().getScaledInstance(size, size, Image.SCALE_SMOOTH);
+                return new ImageIcon(img);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        // 3. Fallback (Gagal Total)
+        System.err.println("Icon tidak ditemukan (Disk/Res): " + fileName);
+        return createPlaceholderIcon(size);
     }
     
     private ImageIcon loadLogo(String fileName) {
-        try {
-            java.net.URL imgURL = getClass().getResource("/icon/" + fileName);
-            if (imgURL == null) {
-                System.err.println("Logo tidak ditemukan: /icon/" + fileName);
-                return createPlaceholderIcon(300);
-            }
-            return new ImageIcon(imgURL);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return createPlaceholderIcon(300);
+        // 1. CARA EXE
+        String pathDisk = "icon/" + fileName;
+        File f = new File(pathDisk);
+        
+        if (f.exists()) {
+            ImageIcon icon = new ImageIcon(pathDisk);
+            if (icon.getImageLoadStatus() == MediaTracker.COMPLETE) return icon;
         }
+
+        // 2. CARA NETBEANS
+        java.net.URL url = getClass().getResource("/Icon/" + fileName);
+        if (url != null) {
+            return new ImageIcon(url);
+        }
+
+        // 3. Gagal Total
+        return createPlaceholderIcon(300);
     }
-    
+    // ============================================================
+
     private ImageIcon createPlaceholderIcon(int size) {
         BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = img.createGraphics();
         g2d.setColor(Color.RED);
         g2d.fillRect(0, 0, size, size);
         g2d.setColor(Color.WHITE);
-        g2d.drawString("LOGO GAGAL DIMUAT", 50, size / 2);
+        g2d.drawString("LOGO GAGAL", 10, size / 2); 
         g2d.dispose();
         return new ImageIcon(img);
     }
