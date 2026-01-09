@@ -84,6 +84,10 @@ public class Mainmenu extends javax.swing.JFrame {
       
     public Mainmenu() throws SQLException {
         initComponents();
+        javax.swing.ImageIcon iconApp = loadTopImage("logo1.png"); // Ganti nama file sesuai icon kamu
+if (iconApp != null) {
+    this.setIconImage(iconApp.getImage());
+}
         setUndecorated(true);
         setExtendedState(MAXIMIZED_BOTH);
         
@@ -311,7 +315,22 @@ public class Mainmenu extends javax.swing.JFrame {
         // 3. Fallback jika gagal keduanya
         System.err.println("Icon tidak ditemukan (Disk/Res): " + fileName);
     }
+// ============================================================
+    // HELPER KHUSUS UNTUK LOAD GAMBAR ICON APLIKASI (HYBRID)
+    // ============================================================
+    private javax.swing.ImageIcon loadTopImage(String fileName) {
+        // 1. CARA EXE: Cek folder "icon/" di luar
+        File f = new File("icon/" + fileName);
+        if (f.exists()) return new javax.swing.ImageIcon(f.getAbsolutePath());
 
+        // 2. CARA NETBEANS: Cek resource internal "/Icon/"
+        java.net.URL url = getClass().getResource("/Icon/" + fileName);
+        if (url != null) return new javax.swing.ImageIcon(url);
+
+        // 3. Fallback
+        System.err.println("Gambar icon aplikasi tidak ditemukan: " + fileName);
+        return null;
+    }
     private String getButtonName(javax.swing.JButton btn) {
         if (btn == dashboardbtn) return "dashboard";
         if (btn == databarangbtn) return "databarang";

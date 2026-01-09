@@ -256,7 +256,7 @@ public class editdatapengguna extends JPanel {
     private ImageIcon loadTopImage(String fileName) {
         // 1. CARA EXE: Cek folder luar "icon/" di folder instalasi
         // Asumsi: di Inno Setup, kamu menaruh semua gambar (termasuk dari folder Images) ke dalam folder "{app}\icon"
-        String pathDisk = "icon/" + fileName;
+        String pathDisk = "images/" + fileName;
         File f = new File(pathDisk);
         
         if (f.exists()) {
