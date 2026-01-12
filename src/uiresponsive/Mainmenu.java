@@ -955,7 +955,7 @@ if (iconApp != null) {
     }//GEN-LAST:event_datahutangbtnActionPerformed
 
     private void keluarbtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_keluarbtnActionPerformed
-    setActiveButton(keluarbtn);
+      setActiveButton(keluarbtn);
 
     int pilihan = JOptionPane.showConfirmDialog(
         this,
@@ -967,22 +967,27 @@ if (iconApp != null) {
 
     if (pilihan != JOptionPane.YES_OPTION) return;
 
-    // Sembunyikan main window (jangan dispose)
+    // ---------- PERBAIKAN: clear session sebelum tampilkan login ----------
+    UIResponsive.currentUser = null;   // hapus user aktif
+    onUserChanged(null);               // refresh UI (sembunyikan menu, dll)
+
+    // Sembunyikan main window (jangan dispose supaya parent dialog masih valid)
     this.setVisible(false);
 
-    // Tampilkan LoginDialog modal dengan parent = this
+    // Tampilkan LoginDialog modal
     LoginDialog loginDialog = new LoginDialog(this);
     loginDialog.setLocationRelativeTo(this);
     loginDialog.setVisible(true); // blocking sampai dialog dispose()
 
-    // Jika login sukses -> set currentUser lalu refresh UI
+    // Jika login sukses -> set currentUser lalu refresh UI dan tampilkan main lagi
     if (loginDialog.isSucceeded()) {
         UIResponsive.currentUser = loginDialog.getLoggedUser();
         onUserChanged(UIResponsive.currentUser);
         this.setVisible(true);
     } else {
-        // Jika batal/close dialog -> kembali ke main (atau exit jika memang mau)
-        this.setVisible(true);
+        // Jika batal/close dialog -> jangan kembali ke dashboard tanpa login.
+        // Pilihan sederhana: keluar aplikasi.
+        System.exit(0);
     }
     }//GEN-LAST:event_keluarbtnActionPerformed
 

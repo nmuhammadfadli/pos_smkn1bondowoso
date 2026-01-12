@@ -65,7 +65,7 @@ public class transaksipenjualan extends JPanel {
     private JComboBox<String> cmbMetodeBayar;
 
     // Tombol & Checkbox
-    private JButton btnCetak, btnSimpan, btnHapus;
+    private JButton btnSimpan, btnHapus;
     private JCheckBox chkLangsungCetak; // [BARU] Checkbox
 
     // Logic Variables
@@ -275,29 +275,29 @@ public class transaksipenjualan extends JPanel {
         btnPanel.setOpaque(false);
         btnPanel.setAlignmentX(Component.RIGHT_ALIGNMENT); // Rata kanan dalam Box
 
-        btnCetak = createModernButton("Cetak", BTN_PURPLE);
+      
         btnSimpan = createModernButton("Simpan", BTN_GREEN);
         btnHapus = createModernButton("Hapus", BTN_RED);
 
-        btnPanel.add(btnCetak);
+       
         btnPanel.add(btnSimpan);
         btnPanel.add(btnHapus);
 
         // Panel Checkbox (FlowLayout Right agar rata kanan di bawah tombol "Cetak")
-        JPanel checkPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 5));
-        checkPanel.setOpaque(false);
-        checkPanel.setAlignmentX(Component.RIGHT_ALIGNMENT);
+//        JPanel checkPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 5));
+//        checkPanel.setOpaque(false);
+//        checkPanel.setAlignmentX(Component.RIGHT_ALIGNMENT);
+//
+//        chkLangsungCetak = new JCheckBox("Langsung Cetak Nota?");
+//        chkLangsungCetak.setFont(new Font("SansSerif", Font.PLAIN, 13));
+//        chkLangsungCetak.setOpaque(false);
+//        chkLangsungCetak.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        chkLangsungCetak = new JCheckBox("Langsung Cetak Nota?");
-        chkLangsungCetak.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        chkLangsungCetak.setOpaque(false);
-        chkLangsungCetak.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        checkPanel.add(chkLangsungCetak);
+        //checkPanel.add(chkLangsungCetak);
 
         // Gabungkan
         bottomRight.add(btnPanel);
-        bottomRight.add(checkPanel);
+        //bottomRight.add(checkPanel);
 
         bottomPanel.add(bottomLeft, BorderLayout.WEST);
         bottomPanel.add(bottomRight, BorderLayout.EAST);
@@ -494,7 +494,6 @@ public class transaksipenjualan extends JPanel {
         });
         btnHapus.addActionListener(e -> onHapus());
         btnSimpan.addActionListener(e -> onBayar());
-        btnCetak.addActionListener(e -> onCetak());
         tabel.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
