@@ -208,10 +208,10 @@ import java.util.List;
                     "FOR EACH ROW " +
                     "BEGIN " +
                     "  UPDATE detail_barang SET stok = stok + NEW.stok " +
-                    "    WHERE id_barang = NEW.id_barang AND id_supplier = NEW.id_supplier AND harga_jual = CAST(NEW.harga_beli AS TEXT);\n" +
+                    "    WHERE id_barang = NEW.id_barang AND id_supplier = NEW.id_supplier;\n" +
                     "  INSERT INTO detail_barang (id_barang, id_supplier, stok, harga_jual, tanggal_exp, barcode, id_detail_pembelian) " +
                     "    SELECT NEW.id_barang, NEW.id_supplier, NEW.stok, CAST(NEW.harga_beli AS TEXT), NULL, NULL, NEW.id_detail_pembelian " +
-                    "    WHERE NOT EXISTS (SELECT 1 FROM detail_barang WHERE id_barang = NEW.id_barang AND id_supplier = NEW.id_supplier AND harga_jual = CAST(NEW.harga_beli AS TEXT));\n" +
+                    "    WHERE NOT EXISTS (SELECT 1 FROM detail_barang WHERE id_barang = NEW.id_barang AND id_supplier = NEW.id_supplier);\n" +
                     "END;"
                 );
             } catch (Throwable t) {

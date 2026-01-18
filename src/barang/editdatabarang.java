@@ -22,7 +22,7 @@ import Helper.DatabaseHelper;
 /**
  * editdatabarang - layout fixed:
  * Row0: Kode | Barcode | Stok
- * Row1: Harga Jual | Expired | (spacer)
+ * Row1: Harga Jual | Expired | Harga Beli
  * Row2: Nama Barang | Kategori | Supplier
  * * Pemanggilan gambar sudah diperbaiki (Hybrid) agar jalan di EXE.
  */
@@ -31,6 +31,7 @@ public class editdatabarang extends JPanel {
     private RoundedTextField txtBarcode;
     private RoundedTextField txtStok;
     private RoundedTextField txtHarga;
+    private RoundedTextField txtHargaBeli; // <-- TAMBAHKAN INI
     private JDateChooser dateExpired;
     private RoundedTextField txtNama;
     private RoundedTextField txtKategori;
@@ -63,9 +64,9 @@ public class editdatabarang extends JPanel {
         // Tambahkan icon/gambar tanpa mengubah UI lain
         JLabel imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        
+
         // [UBAH DI SINI] Gunakan helper method hybrid
-        imageLabel.setIcon(loadTopImage("tambahbarang.png")); 
+        imageLabel.setIcon(loadTopImage("tambahbarang.png"));
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
@@ -89,7 +90,7 @@ public class editdatabarang extends JPanel {
         gbc.gridx = 2;
         txtStok = createField(form, gbc, "Stok:");
 
-        // Row 1: Harga Jual | Expired | spacer
+        // Row 1: Harga Jual | Expired | Harga Beli
         gbc.gridx = 0; gbc.gridy = 1;
         txtHarga = createField(form, gbc, "Harga Jual:");
         gbc.gridx = 1;
@@ -100,7 +101,7 @@ public class editdatabarang extends JPanel {
         expirePanel.add(dateExpired, BorderLayout.CENTER);
         form.add(expirePanel, gbc);
         gbc.gridx = 2;
-        form.add(Box.createHorizontalStrut(10), gbc);
+        txtHargaBeli = createField(form, gbc, "Harga Beli:");
 
         // Row 2: Nama Barang | Kategori | Supplier
         gbc.gridx = 0; gbc.gridy = 2;
@@ -225,6 +226,24 @@ public class editdatabarang extends JPanel {
                     try { target.setHargaJual(new BigDecimal(cleaned)); } catch (Exception ex) {}
                 }
 
+                // ----- simpan harga beli (jika diisi) -----
+                String hb = txtHargaBeli.getText().trim();
+                if (!hb.isEmpty()) {
+                    String cleanedHb = cleanNumberString(hb);
+                    try {
+                        java.math.BigDecimal hargaBeliNew = new java.math.BigDecimal(cleanedHb);
+                        // hanya simpan ke table detail_pembelian jika target punya id_detail_pembelian
+                        Integer idDetPemb = target.getIdDetailPembelian();
+                        if (idDetPemb != null) {
+                            updateDetailPembelianHargaBeli(idDetPemb, hargaBeliNew); // method helper di bawah
+                        } else {
+                            // jika tidak ada id_detail_pembelian, abaikan atau beri notifikasi jika mau
+                        }
+                    } catch (NumberFormatException ex) {
+                        // abaikan jika parsing gagal (harga jual tetap disimpan)
+                    }
+                }
+
                 Date d = dateExpired.getDate();
                 if (d != null) {
                     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -314,6 +333,14 @@ public class editdatabarang extends JPanel {
                     NumberFormat nf = NumberFormat.getInstance(new Locale("in","ID"));
                     txtHarga.setText(nf.format(detail.getHargaJual()));
                 } else txtHarga.setText("");
+
+                if (detail.getHargaBeli() != null) {
+                    NumberFormat nf2 = NumberFormat.getInstance(new Locale("in","ID"));
+                    txtHargaBeli.setText(nf2.format(detail.getHargaBeli()));
+                } else {
+                    txtHargaBeli.setText("");
+                }
+
                 if (detail.getTanggalExp() != null && !detail.getTanggalExp().trim().isEmpty()) {
                     try { dateExpired.setDate(new SimpleDateFormat("yyyy-MM-dd").parse(detail.getTanggalExp())); } catch (ParseException ex) { dateExpired.setDate(null); }
                 } else dateExpired.setDate(null);
@@ -327,6 +354,7 @@ public class editdatabarang extends JPanel {
             // enable category & supplier only in per-detail
             txtKategori.setEnabled(perDetail);
             txtSupplier.setEnabled(perDetail);
+
             txtKategori.setToolTipText(perDetail ? "Klik untuk pilih kategori" : "Kategori dapat diubah di mode per-detail");
             txtSupplier.setToolTipText(perDetail ? "Klik untuk pilih supplier" : "Supplier dapat diubah di mode per-detail");
 
@@ -335,6 +363,7 @@ public class editdatabarang extends JPanel {
             txtBarcode.setEnabled(enableDetailFields);
             txtStok.setEnabled(enableDetailFields);
             txtHarga.setEnabled(enableDetailFields);
+            txtHargaBeli.setEnabled(enableDetailFields);
             dateExpired.setEnabled(enableDetailFields);
 
             revalidate(); repaint();
@@ -348,6 +377,7 @@ public class editdatabarang extends JPanel {
         txtBarcode.setText("");
         txtStok.setText("");
         txtHarga.setText("");
+        txtHargaBeli.setText("");
         dateExpired.setDate(null);
         txtNama.setText("");
         txtKategori.setText("");
@@ -357,13 +387,26 @@ public class editdatabarang extends JPanel {
     }
 
     // ============================================================
+    // Update helper: tulis harga_beli ke detail_pembelian
+    // ============================================================
+    private void updateDetailPembelianHargaBeli(int idDetailPembelian, BigDecimal hargaBeli) throws SQLException {
+        String sql = "UPDATE detail_pembelian SET harga_beli = ? WHERE id_detail_pembelian = ?";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, hargaBeli == null ? BigDecimal.ZERO.toPlainString() : hargaBeli.toPlainString());
+            ps.setInt(2, idDetailPembelian);
+            ps.executeUpdate();
+        }
+    }
+
+    // ============================================================
     // [BARU] HELPER METHOD UNTUK IMAGE (HYBRID EXE/NETBEANS)
     // ============================================================
     private ImageIcon loadTopImage(String fileName) {
         // 1. CARA EXE: Cek folder luar "icon/"
         String pathDisk = "icon/" + fileName;
         File f = new File(pathDisk);
-        
+
         if (f.exists()) {
             return new ImageIcon(pathDisk);
         }

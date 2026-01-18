@@ -45,121 +45,207 @@ public class databarang extends JPanel {
         if (isShowing()) loadData();
     }
 
-    private void showDetailSelector(final int barangId) {
-        if (detailDao == null) {
-            JOptionPane.showMessageDialog(this, "Database detail tidak tersedia.", "Error", JOptionPane.ERROR_MESSAGE);
+  private void showDetailSelector(final int barangId) {
+    if (detailDao == null) {
+        JOptionPane.showMessageDialog(this, "Database detail tidak tersedia.", "Error", JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+
+    final JDialog d = new JDialog(SwingUtilities.getWindowAncestor(this), "Detail Barang - ID: " + barangId, Dialog.ModalityType.APPLICATION_MODAL);
+    d.setSize(800, 420);
+    d.setLocationRelativeTo(this);
+
+    JPanel p = new JPanel(new BorderLayout(10,10));
+    p.setBorder(new EmptyBorder(10,10,10,10));
+    p.setBackground(Color.WHITE);
+
+    // table untuk daftar detail — tambahkan kolom Harga Beli
+    String[] cols = {"ID Detail", "Barcode", "Nama Barang", "Kategori", "Supplier", "Harga Jual", "Harga Beli", "Expired", "Stok"};
+    final DefaultTableModel m = new DefaultTableModel(cols, 0) {
+        @Override public boolean isCellEditable(int r, int c) { return false; }
+    };
+    final JTable t = new JTable(m);
+    t.setRowHeight(26);
+    JScrollPane sp = new JScrollPane(t);
+    p.add(sp, BorderLayout.CENTER);
+
+    // tombol bawah: Tambah, Edit, Hapus, Edit Harga Beli, Close
+    JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+    JButton bTambah = new JButton("Tambah");
+    JButton bEdit   = new JButton("Edit");
+    JButton bHapus  = new JButton("Hapus");
+    JButton bEditHarga = new JButton("Edit Harga Beli");
+    JButton bClose  = new JButton("Close");
+    btns.add(bTambah); btns.add(bEdit); btns.add(bHapus); btns.add(bEditHarga); btns.add(bClose);
+    p.add(btns, BorderLayout.SOUTH);
+
+    // load data detail
+    Runnable load = () -> {
+        try {
+            m.setRowCount(0);
+            java.util.List<DetailBarang> dets = detailDao.findByBarangId(barangId);
+            if (dets != null) {
+                NumberFormat nf = NumberFormat.getInstance(new Locale("in","ID"));
+                for (DetailBarang db : dets) {
+                    String hargaJual = db.getHargaJual() == null ? "" : nf.format(db.getHargaJual());
+                    String hargaBeli = db.getHargaBeli() == null ? "" : nf.format(db.getHargaBeli());
+                    m.addRow(new Object[]{
+                        db.getId(),
+                        db.getBarcode(),
+                        db.getNamaBarang(),   // tampilkan nama parent supaya jelas
+//                        db.getNamaKategori() == null ? "" : db.getNamaKategori(), // jika tersedia
+//                        db.getNamaSupplier() == null ? "" : db.getNamaSupplier(),
+                        hargaJual,
+                        hargaBeli,
+                        db.getTanggalExp(),
+                        db.getStok()
+                    });
+                }
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Gagal memuat detail:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    };
+
+    load.run();
+
+    // action: tambah => set context dan buka halaman full
+    bTambah.addActionListener(ev -> {
+        DetailContext.parentBarangId = barangId;
+        DetailContext.editingDetailId = null;
+        JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+        if (frame instanceof uiresponsive.Mainmenu) ((uiresponsive.Mainmenu) frame).showTambahDetailBarang();
+        d.dispose();
+    });
+
+    // edit => harus pilih baris (buka layar edit barang)
+    bEdit.addActionListener(ev -> {
+        int selView = t.getSelectedRow();
+        if (selView < 0) {
+            JOptionPane.showMessageDialog(d, "Pilih detail yang akan diedit.", "Validasi", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        int modelRow = t.convertRowIndexToModel(selView);
+        Object o = m.getValueAt(modelRow, 0);
+        Integer idDetail = null;
+        try { idDetail = Integer.parseInt(String.valueOf(o)); } catch (Exception ex) {}
+        if (idDetail == null) {
+            JOptionPane.showMessageDialog(d, "ID detail tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        final JDialog d = new JDialog(SwingUtilities.getWindowAncestor(this), "Detail Barang - ID: " + barangId, Dialog.ModalityType.APPLICATION_MODAL);
-        d.setSize(700, 400);
-        d.setLocationRelativeTo(this);
+        // set context: parent + editing detail
+        try {
+            DetailBarang detail = detailDao.findById(idDetail);
+            if (detail != null) {
+                DetailContext.parentBarangId = detail.getIdBarang();
+                BarangContext.editingId = detail.getIdBarang();
+            } else {
+                DetailContext.parentBarangId = null;
+                BarangContext.editingId = null;
+            }
+        } catch (SQLException ex) {
+            DetailContext.parentBarangId = null;
+            BarangContext.editingId = null;
+        }
+        DetailContext.editingDetailId = idDetail;
+        JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
+        if (frame instanceof uiresponsive.Mainmenu) ((uiresponsive.Mainmenu) frame).showEditDataBarang();
+        d.dispose();
+    });
 
-        JPanel p = new JPanel(new BorderLayout(10,10));
-        p.setBorder(new EmptyBorder(10,10,10,10));
-        p.setBackground(Color.WHITE);
+    // hapus
+    bHapus.addActionListener(ev -> {
+        int selView = t.getSelectedRow();
+        if (selView < 0) { JOptionPane.showMessageDialog(d, "Pilih detail yang akan dihapus.", "Validasi", JOptionPane.WARNING_MESSAGE); return; }
+        int modelRow = t.convertRowIndexToModel(selView);
+        Object o = m.getValueAt(modelRow, 0);
+        Integer idDetail = null;
+        try { idDetail = Integer.parseInt(String.valueOf(o)); } catch (Exception ex) {}
+        if (idDetail == null) { JOptionPane.showMessageDialog(d, "ID detail tidak valid.", "Error", JOptionPane.ERROR_MESSAGE); return; }
+        int ok = JOptionPane.showConfirmDialog(d, "Hapus detail ID: " + idDetail + " ?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        if (ok != JOptionPane.YES_OPTION) return;
+        try {
+            detailDao.delete(idDetail);
+            JOptionPane.showMessageDialog(d, "Detail berhasil dihapus.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
+            load.run();
+            // reload main barang table stok/harga
+            SwingUtilities.invokeLater(() -> loadData());
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(d, "Gagal menghapus detail:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    });
 
-        // table untuk daftar detail
-        String[] cols = {"ID Detail", "Barcode", "Stok", "Harga Jual", "Expired", "Supplier"};
-        final DefaultTableModel m = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
-        final JTable t = new JTable(m);
-        t.setRowHeight(26);
-        JScrollPane sp = new JScrollPane(t);
-        p.add(sp, BorderLayout.CENTER);
+    // === NEW: Edit Harga Beli handler ===
+    bEditHarga.addActionListener(ev -> {
+        int selView = t.getSelectedRow();
+        if (selView < 0) {
+            JOptionPane.showMessageDialog(d, "Pilih detail yang akan diedit harga belinya.", "Validasi", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        int modelRow = t.convertRowIndexToModel(selView);
+        Object o = m.getValueAt(modelRow, 0);
+        Integer idDetail = null;
+        try { idDetail = Integer.parseInt(String.valueOf(o)); } catch (Exception ex) {}
+        if (idDetail == null) {
+            JOptionPane.showMessageDialog(d, "ID detail tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
 
-        // tombol bawah: Tambah, Edit, Hapus, Close
-        JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-        JButton bTambah = new JButton("Tambah");
-        JButton bEdit   = new JButton("Edit");
-        JButton bHapus  = new JButton("Hapus");
-        JButton bClose  = new JButton("Close");
-        btns.add(bTambah); btns.add(bEdit); btns.add(bHapus); btns.add(bClose);
-        p.add(btns, BorderLayout.SOUTH);
+        try {
+            DetailBarang detail = detailDao.findById(idDetail);
+            if (detail == null) {
+                JOptionPane.showMessageDialog(d, "Detail tidak ditemukan.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
 
-        // load data detail
-        Runnable load = () -> {
+            Integer idDetPembelian = detail.getIdDetailPembelian();
+            if (idDetPembelian == null) {
+                JOptionPane.showMessageDialog(d, "Detail ini tidak terhubung ke record pembelian (id_detail_pembelian kosong). Harga beli tidak tersedia untuk diedit.", "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+
+            NumberFormat nf = NumberFormat.getInstance(new Locale("in","ID"));
+            String curFmt = (detail.getHargaBeli() == null) ? "" : nf.format(detail.getHargaBeli());
+
+            String input = JOptionPane.showInputDialog(d, "Harga Beli (angka, tanpa simbol):", curFmt);
+            if (input == null) return; // cancel
+
+            String raw = input.replace(".", "").replace(",", "").trim();
+            if (raw.isEmpty()) {
+                JOptionPane.showMessageDialog(d, "Harga tidak boleh kosong.", "Validasi", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            java.math.BigDecimal newHarga;
             try {
-                m.setRowCount(0);
-                java.util.List<DetailBarang> dets = detailDao.findByBarangId(barangId);
-                if (dets != null) {
-                    NumberFormat nf = NumberFormat.getInstance(new Locale("in","ID"));
-                    for (DetailBarang db : dets) {
-                        String harga = db.getHargaJual() == null ? "" : nf.format(db.getHargaJual());
-                        m.addRow(new Object[]{ db.getId(), db.getBarcode(), db.getStok(), harga, db.getTanggalExp(), db.getNamaSupplier() });
-                    }
+                newHarga = new java.math.BigDecimal(raw);
+                if (newHarga.compareTo(java.math.BigDecimal.ZERO) < 0) {
+                    JOptionPane.showMessageDialog(d, "Harga harus >= 0.", "Validasi", JOptionPane.WARNING_MESSAGE);
+                    return;
                 }
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this, "Gagal memuat detail:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(d, "Format harga tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
             }
-        };
 
-        load.run();
+            // simpan ke tabel detail_pembelian via DAO (method harus ada di DetailBarangDAO)
+            detailDao.updateHargaBeliByDetailPembelianId(idDetPembelian, newHarga);
 
-        // action: tambah => set context dan buka halaman full
-        bTambah.addActionListener(ev -> {
-            DetailContext.parentBarangId = barangId;
-            DetailContext.editingDetailId = null;
-            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-            if (frame instanceof uiresponsive.Mainmenu) ((uiresponsive.Mainmenu) frame).showTambahDetailBarang();
-            d.dispose();
-        });
+            JOptionPane.showMessageDialog(d, "Harga beli berhasil diperbarui.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
+            load.run();
+            SwingUtilities.invokeLater(() -> loadData());
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(d, "Gagal memperbarui harga:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    });
 
-        // edit => harus pilih baris
-   // edit => buka form edit BARANG (bukan tambah detail)
-bEdit.addActionListener(ev -> {
-    int sel = t.getSelectedRow();
-    if (sel < 0) {
-        JOptionPane.showMessageDialog(d, "Pilih detail yang akan diedit.", "Validasi", JOptionPane.WARNING_MESSAGE);
-        return;
-    }
-    Integer idDetail = null;
-    Object o = m.getValueAt(sel, 0);
-    try { idDetail = Integer.parseInt(String.valueOf(o)); } catch (Exception ex) {}
-    if (idDetail == null) {
-        JOptionPane.showMessageDialog(d, "ID detail tidak valid.", "Error", JOptionPane.ERROR_MESSAGE);
-        return;
-    }
+    bClose.addActionListener(ev -> d.dispose());
 
-    // set context: parent + editing detail
-    DetailContext.parentBarangId = barangId;
-    DetailContext.editingDetailId = idDetail;
-    BarangContext.editingId = barangId; // buka edit barang
+    d.getContentPane().add(p);
+    d.setVisible(true);
+}
 
-    // buka layar edit barang (agar kategori/supplier/detail juga terlihat)
-    JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-    if (frame instanceof uiresponsive.Mainmenu) ((uiresponsive.Mainmenu) frame).showEditDataBarang();
-    d.dispose();
-});
-
-
-        // hapus
-        bHapus.addActionListener(ev -> {
-            int sel = t.getSelectedRow();
-            if (sel < 0) { JOptionPane.showMessageDialog(d, "Pilih detail yang akan dihapus.", "Validasi", JOptionPane.WARNING_MESSAGE); return; }
-            Integer idDetail = null;
-            Object o = m.getValueAt(sel, 0);
-            try { idDetail = Integer.parseInt(String.valueOf(o)); } catch (Exception ex) {}
-            if (idDetail == null) { JOptionPane.showMessageDialog(d, "ID detail tidak valid.", "Error", JOptionPane.ERROR_MESSAGE); return; }
-            int ok = JOptionPane.showConfirmDialog(d, "Hapus detail ID: " + idDetail + " ?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
-            if (ok != JOptionPane.YES_OPTION) return;
-            try {
-                detailDao.delete(idDetail);
-                JOptionPane.showMessageDialog(d, "Detail berhasil dihapus.", "Sukses", JOptionPane.INFORMATION_MESSAGE);
-                load.run();
-                // reload main barang table stok/harga
-                SwingUtilities.invokeLater(() -> loadData());
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(d, "Gagal menghapus detail:\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-
-        bClose.addActionListener(ev -> d.dispose());
-
-        d.getContentPane().add(p);
-        d.setVisible(true);
-    }
 
 
     private void initUI() {
@@ -207,8 +293,8 @@ bEdit.addActionListener(ev -> {
         // =============================
         // TABEL DATA BARANG
         // =============================
-        // default grouped columns (ID, Barcode, Nama, Kategori, Harga, Stok)
-        String[] columns = {"ID", "Barcode", "Nama Barang", "Kategori", "Harga", "Stok"};
+        // default grouped columns (ID, Barcode, Nama, Kategori, Harga Jual, Harga Beli, Stok)
+        String[] columns = {"ID", "Barcode", "Nama Barang", "Kategori", "Harga Jual", "Harga Beli", "Stok"};
         model = new DefaultTableModel(columns, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -365,9 +451,9 @@ bEdit.addActionListener(ev -> {
             showDetailMode = !showDetailMode;
             btnToggleView.setText(showDetailMode ? "Tampil Grup" : "Tampil Per-Detail");
             if (showDetailMode) {
-                model.setColumnIdentifiers(new Object[] {"ID Detail", "Barcode", "Nama Barang", "Kategori", "Supplier", "Harga", "Stok"});
+                model.setColumnIdentifiers(new Object[] {"ID Detail", "Barcode", "Nama Barang", "Kategori", "Supplier", "Harga Jual", "Harga Beli", "Expired", "Stok"});
             } else {
-                model.setColumnIdentifiers(new Object[] {"ID", "Barcode", "Nama Barang", "Kategori", "Harga", "Stok"});
+                model.setColumnIdentifiers(new Object[] {"ID", "Barcode", "Nama Barang", "Kategori", "Harga Jual", "Harga Beli", "Stok"});
             }
             loadData();
         });
@@ -394,24 +480,29 @@ bEdit.addActionListener(ev -> {
                         java.util.List<DetailBarang> dets = detailDao.findByBarangId(b.getId());
                         if (dets != null && !dets.isEmpty()) {
                             for (DetailBarang d : dets) {
-                                String harga = d.getHargaJual() == null ? "" : nf.format(d.getHargaJual());
+                                String hargaJual = d.getHargaJual() == null ? "" : nf.format(d.getHargaJual());
+                                String hargaBeli = d.getHargaBeli() == null ? "" : nf.format(d.getHargaBeli());
                                 model.addRow(new Object[]{
                                         d.getId(),                    // ID Detail
                                         d.getBarcode() == null ? "" : d.getBarcode(),
-                                        b.getNama(),                 // Nama Barang
-                                        b.getNamaKategori(),         // Kategori
+                                        b.getNama(),                 // Nama Barang (parent)
+                                        b.getNamaKategori(),         // Kategori (parent)
                                         d.getNamaSupplier() == null ? "" : d.getNamaSupplier(), // Supplier
-                                        harga,
+                                        hargaJual,
+                                        hargaBeli,
+                                        d.getTanggalExp(),
                                         d.getStok()
                                 });
                             }
                         } else {
-                            // jika tidak ada detail, tampilkan barang dengan kolom detail kosong
+                            // jika tidak ada detail, tampilkan barang dengan kolom detail kosong (sesuaikan jumlah kolom)
                             model.addRow(new Object[]{
                                     null,
                                     "",
                                     b.getNama(),
                                     b.getNamaKategori(),
+                                    "",
+                                    "",
                                     "",
                                     "",
                                     0
@@ -423,15 +514,19 @@ bEdit.addActionListener(ev -> {
                 // grouped (original behavior) — satu baris per barang
                 for (Barang b : list) {
                     int stokTotal = 0;
-                    String hargaStr = "";
+                    String hargaJualStr = "";
+                    String hargaBeliStr = "";
                     String barcode = "";
                     try {
                         if (detailDao != null) {
                             java.util.List<DetailBarang> dets = detailDao.findByBarangId(b.getId());
                             if (dets != null && !dets.isEmpty()) {
                                 for (DetailBarang d : dets) stokTotal += d.getStok();
-                                if (dets.get(0).getHargaJual() != null) hargaStr = nf.format(dets.get(0).getHargaJual());
-                                if (dets.get(0).getBarcode() != null) barcode = dets.get(0).getBarcode();
+                                // gunakan detail pertama sebagai representative harga (seperti sebelumnya)
+                                DetailBarang rep = dets.get(0);
+                                if (rep.getHargaJual() != null) hargaJualStr = nf.format(rep.getHargaJual());
+                                if (rep.getHargaBeli() != null) hargaBeliStr = nf.format(rep.getHargaBeli());
+                                if (rep.getBarcode() != null) barcode = rep.getBarcode();
                             }
                         }
                     } catch (SQLException ignore) {}
@@ -441,7 +536,8 @@ bEdit.addActionListener(ev -> {
                             barcode,
                             b.getNama(),
                             b.getNamaKategori(),
-                            (hargaStr==null||hargaStr.isEmpty()) ? "" : hargaStr,
+                            (hargaJualStr==null||hargaJualStr.isEmpty()) ? "" : hargaJualStr,
+                            (hargaBeliStr==null||hargaBeliStr.isEmpty()) ? "" : hargaBeliStr,
                             stokTotal
                     });
                 }
@@ -471,14 +567,17 @@ bEdit.addActionListener(ev -> {
                                 (d.getNamaSupplier()!=null && d.getNamaSupplier().toLowerCase().contains(lower)) ||
                                 (d.getBarcode()!=null && d.getBarcode().toLowerCase().contains(lower));
                         if (match) {
-                            String harga = d.getHargaJual() == null ? "" : nf.format(d.getHargaJual());
+                            String hargaJual = d.getHargaJual() == null ? "" : nf.format(d.getHargaJual());
+                            String hargaBeli = d.getHargaBeli() == null ? "" : nf.format(d.getHargaBeli());
                             model.addRow(new Object[]{
                                     d.getId(),
                                     d.getBarcode() == null ? "" : d.getBarcode(),
                                     b.getNama(),
                                     b.getNamaKategori(),
                                     d.getNamaSupplier() == null ? "" : d.getNamaSupplier(),
-                                    harga,
+                                    hargaJual,
+                                    hargaBeli,
+                                    d.getTanggalExp(),
                                     d.getStok()
                             });
                         }
@@ -490,16 +589,20 @@ bEdit.addActionListener(ev -> {
                     if (lower.isEmpty() ||
                             (b.getNama()!=null && b.getNama().toLowerCase().contains(lower)) ||
                             (b.getNamaKategori()!=null && b.getNamaKategori().toLowerCase().contains(lower))) {
-                        int stok = 0; String harga=""; String barcode="";
+                        int stok = 0; String hargaJual=""; String hargaBeli=""; String barcode="";
                         if (detailDao != null) {
                             try {
                                 java.util.List<DetailBarang> dets = detailDao.findByBarangId(b.getId());
                                 for (DetailBarang d: dets) stok += d.getStok();
-                                if (!dets.isEmpty() && dets.get(0).getHargaJual()!=null) harga = nf.format(dets.get(0).getHargaJual());
-                                if (!dets.isEmpty() && dets.get(0).getBarcode()!=null) barcode = dets.get(0).getBarcode();
+                                if (!dets.isEmpty()) {
+                                    DetailBarang rep = dets.get(0);
+                                    if (rep.getHargaJual()!=null) hargaJual = nf.format(rep.getHargaJual());
+                                    if (rep.getHargaBeli()!=null) hargaBeli = nf.format(rep.getHargaBeli());
+                                    if (rep.getBarcode()!=null) barcode = rep.getBarcode();
+                                }
                             } catch (SQLException ignore) {}
                         }
-                        model.addRow(new Object[]{b.getId(), barcode, b.getNama(), b.getNamaKategori(), harga, stok});
+                        model.addRow(new Object[]{b.getId(), barcode, b.getNama(), b.getNamaKategori(), hargaJual, hargaBeli, stok});
                     }
                 }
             }

@@ -10,6 +10,7 @@ public class DetailBarang {
     private String barcode;
     private int stok;
     private BigDecimal hargaJual;
+    private BigDecimal hargaBeli;
     private String tanggalExp;
     private int idBarang;
     private String namaBarang;
@@ -18,9 +19,6 @@ public class DetailBarang {
     private Integer idDetailPembelian;
     
     private String namaSupplier;
-
-
-
     public DetailBarang() {}
     
 
@@ -57,4 +55,12 @@ public void setNamaSupplier(String namaSupplier) { this.namaSupplier = namaSuppl
 
     public Integer getIdDetailPembelian() { return idDetailPembelian; }
     public void setIdDetailPembelian(Integer idDetailPembelian) { this.idDetailPembelian = idDetailPembelian; }
+    
+    public BigDecimal getHargaBeli() {
+    return hargaBeli;
+    }
+
+    public void setHargaBeli(BigDecimal hargaBeli) {
+    this.hargaBeli = hargaBeli;
+    }
 }
