@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.swing.table.TableRowSorter;
 import pengguna.Pengguna;
 import uiresponsive.UIResponsive;
 
@@ -65,8 +66,8 @@ public class transaksipenjualan extends JPanel {
     private JComboBox<String> cmbMetodeBayar;
 
     // Tombol & Checkbox
-    private JButton btnSimpan, btnHapus;
-    private JCheckBox chkLangsungCetak; // [BARU] Checkbox
+    private JButton btnSimpan, btnHapus; // btnCetak removed as requested
+    private JCheckBox chkLangsungCetak; // [BARU] Checkbox (logic inverted below)
 
     // Logic Variables
     private JTextField txtHarga = new JTextField();
@@ -275,29 +276,28 @@ public class transaksipenjualan extends JPanel {
         btnPanel.setOpaque(false);
         btnPanel.setAlignmentX(Component.RIGHT_ALIGNMENT); // Rata kanan dalam Box
 
-      
+        // btnCetak removed — only Simpan & Hapus remain
         btnSimpan = createModernButton("Simpan", BTN_GREEN);
         btnHapus = createModernButton("Hapus", BTN_RED);
 
-       
         btnPanel.add(btnSimpan);
         btnPanel.add(btnHapus);
 
-        // Panel Checkbox (FlowLayout Right agar rata kanan di bawah tombol "Cetak")
-//        JPanel checkPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 5));
-//        checkPanel.setOpaque(false);
-//        checkPanel.setAlignmentX(Component.RIGHT_ALIGNMENT);
-//
-//        chkLangsungCetak = new JCheckBox("Langsung Cetak Nota?");
-//        chkLangsungCetak.setFont(new Font("SansSerif", Font.PLAIN, 13));
-//        chkLangsungCetak.setOpaque(false);
-//        chkLangsungCetak.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        // Panel Checkbox (FlowLayout Right agar rata kanan di bawah tombol)
+        JPanel checkPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 5));
+        checkPanel.setOpaque(false);
+        checkPanel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
-        //checkPanel.add(chkLangsungCetak);
+        chkLangsungCetak = new JCheckBox("Langsung Cetak Nota?");
+        chkLangsungCetak.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        chkLangsungCetak.setOpaque(false);
+        chkLangsungCetak.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        checkPanel.add(chkLangsungCetak);
 
         // Gabungkan
         bottomRight.add(btnPanel);
-        //bottomRight.add(checkPanel);
+        bottomRight.add(checkPanel);
 
         bottomPanel.add(bottomLeft, BorderLayout.WEST);
         bottomPanel.add(bottomRight, BorderLayout.EAST);
@@ -494,6 +494,7 @@ public class transaksipenjualan extends JPanel {
         });
         btnHapus.addActionListener(e -> onHapus());
         btnSimpan.addActionListener(e -> onBayar());
+        // btnCetak listener removed (button deleted)
         tabel.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -692,9 +693,8 @@ private void onBayar() {
         }
     }
 
-   // ====== Ganti method onCetak() dengan versi yang menerima optional kode (atau gunakan printTransaction) ======
+   // ====== onCetak() left in case you want manual printing elsewhere ======
 private void onCetak() {
-    // Jika tombol Cetak dipencet manual, gunakan kode di txtKode (jika ada) atau ambil yang terakhir
     try {
         String kode = txtKode.getText();
         if (kode == null || kode.trim().isEmpty()) {
@@ -704,7 +704,6 @@ private void onCetak() {
             JOptionPane.showMessageDialog(this, "Tidak ada transaksi untuk dicetak.");
             return;
         }
-        // Panggil helper cetak
         printTransaction(kode);
     } catch (Exception e) {
         JOptionPane.showMessageDialog(this, "Gagal mencetak: " + e.getMessage());
@@ -768,7 +767,8 @@ private void printTransaction(String kodeTransaksi) throws Exception {
                     JasperReport jasperReport = JasperCompileManager.compileReport(is);
                     JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, params, conn);
                     JasperViewer.viewReport(jasperPrint, false);
-                    if (chkLangsungCetak.isSelected()) {
+                    // INVERTED LOGIC: when checkbox is CHECKED -> DO NOT print automatically
+                    if (!chkLangsungCetak.isSelected()) {
                         JasperPrintManager.printReport(jasperPrint, true);
                     }
                     return;
@@ -785,7 +785,8 @@ private void printTransaction(String kodeTransaksi) throws Exception {
                 try (InputStream is = jasperStream) {
                     JasperPrint jasperPrint = JasperFillManager.fillReport(is, params, conn);
                     JasperViewer.viewReport(jasperPrint, false);
-                    if (chkLangsungCetak.isSelected()) {
+                    // INVERTED LOGIC: when checkbox is CHECKED -> DO NOT print automatically
+                    if (!chkLangsungCetak.isSelected()) {
                         JasperPrintManager.printReport(jasperPrint, true);
                     }
                     return;
@@ -852,106 +853,225 @@ private void printTransaction(String kodeTransaksi) throws Exception {
         return prefix + String.format("%04d", next);
     }
 
-    private void openPilihBarangFrame() {
-        try {
-            List<DetailBarang> list = detailDao.findAll();
-            JDialog dlg = new JDialog(SwingUtilities.getWindowAncestor(this), "Pilih Barang", Dialog.ModalityType.APPLICATION_MODAL);
-            dlg.setSize(600, 400);
-            dlg.setLocationRelativeTo(this);
-            String[] col = {"ID", "Barcode", "Nama", "Stok", "Harga"};
-            DefaultTableModel m = new DefaultTableModel(col, 0) {
-                @Override
-                public boolean isCellEditable(int r, int c) {
-                    return false;
+   private void openPilihBarangFrame() {
+    try {
+        List<DetailBarang> list = detailDao.findAll();
+
+        JDialog dlg = new JDialog(
+                SwingUtilities.getWindowAncestor(this),
+                "Pilih Barang",
+                Dialog.ModalityType.APPLICATION_MODAL
+        );
+        dlg.setSize(650, 450);
+        dlg.setLocationRelativeTo(this);
+
+        String[] col = {"ID", "Barcode", "Nama", "Stok", "Harga"};
+        DefaultTableModel m = new DefaultTableModel(col, 0) {
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
+        };
+
+        for (DetailBarang d : list) {
+            m.addRow(new Object[]{
+                    d.getId(),
+                    d.getBarcode(),
+                    d.getNamaBarang(),
+                    d.getStok(),
+                    d.getHargaJual()
+            });
+        }
+
+        JTable t = new JTable(m);
+        t.setRowHeight(25);
+
+        // 🔍 SORTER + FILTER
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(m);
+        t.setRowSorter(sorter);
+
+        // 🔍 TEXT SEARCH
+        JTextField txtSearch = new JTextField();
+        txtSearch.setToolTipText("Cari nama atau barcode barang...");
+        txtSearch.getDocument().addDocumentListener(new DocumentListener() {
+            private void filter() {
+                String text = txtSearch.getText();
+                if (text.trim().isEmpty()) {
+                    sorter.setRowFilter(null);
+                } else {
+                    sorter.setRowFilter(RowFilter.regexFilter("(?i)" + text, 1, 2));
+                    // kolom 1 = Barcode
+                    // kolom 2 = Nama
                 }
-            };
-            for (DetailBarang d : list) m.addRow(new Object[]{d.getId(), d.getBarcode(), d.getNamaBarang(), d.getStok(), d.getHargaJual()});
-            JTable t = new JTable(m);
-            t.setRowHeight(25);
-            t.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    if (e.getClickCount() == 2) {
-                        int r = t.getSelectedRow();
-                        if (r >= 0) {
-                            int id = (int) t.getValueAt(r, 0);
-                            for (DetailBarang db : list) if (db.getId() == id) selectedDetail = db;
-                            txtBarcode.setText(selectedDetail.getBarcode());
-                            txtNama.setText(selectedDetail.getNamaBarang());
-                            txtHarga.setText(selectedDetail.getHargaJual().toPlainString());
-                            txtJumlah.requestFocus();
-                            dlg.dispose();
+            }
+
+            public void insertUpdate(DocumentEvent e) { filter(); }
+            public void removeUpdate(DocumentEvent e) { filter(); }
+            public void changedUpdate(DocumentEvent e) { filter(); }
+        });
+
+        // DOUBLE CLICK PILIH BARANG
+        t.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int r = t.convertRowIndexToModel(t.getSelectedRow());
+                    if (r >= 0) {
+                        int id = (int) m.getValueAt(r, 0);
+                        for (DetailBarang db : list) {
+                            if (db.getId() == id) {
+                                selectedDetail = db;
+                                break;
+                            }
                         }
+                        txtBarcode.setText(selectedDetail.getBarcode());
+                        txtNama.setText(selectedDetail.getNamaBarang());
+                        txtHarga.setText(selectedDetail.getHargaJual().toPlainString());
+                        txtJumlah.requestFocus();
+                        dlg.dispose();
                     }
                 }
-            });
-            JPanel p = new JPanel(new BorderLayout());
-            p.add(new JScrollPane(t), BorderLayout.CENTER);
-            JLabel info = new JLabel("Klik 2x pada barang untuk memilih");
-            info.setHorizontalAlignment(SwingConstants.CENTER);
-            info.setBorder(new EmptyBorder(5, 0, 5, 0));
-            p.add(info, BorderLayout.SOUTH);
-            dlg.add(p);
-            dlg.setVisible(true);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+            }
+        });
 
-    private void openPilihVoucherFrame() {
-        try {
-            List<Voucher> list = DatabaseHelper.getAllVouchers();
-            JDialog dlg = new JDialog(SwingUtilities.getWindowAncestor(this), "Pilih Voucher", Dialog.ModalityType.APPLICATION_MODAL);
-            dlg.setSize(500, 350);
-            dlg.setLocationRelativeTo(this);
-            String[] col = {"Kode", "Nominal"};
-            DefaultTableModel m = new DefaultTableModel(col, 0) {
-                @Override
-                public boolean isCellEditable(int r, int c) {
-                    return false;
+        // PANEL ATAS (SEARCH)
+        JPanel top = new JPanel(new BorderLayout(5, 5));
+        top.setBorder(new EmptyBorder(5, 5, 5, 5));
+        top.add(new JLabel("Cari Barang:"), BorderLayout.WEST);
+        top.add(txtSearch, BorderLayout.CENTER);
+
+        // PANEL UTAMA
+        JPanel p = new JPanel(new BorderLayout());
+        p.add(top, BorderLayout.NORTH);
+        p.add(new JScrollPane(t), BorderLayout.CENTER);
+
+        JLabel info = new JLabel("Ketik nama/barcode lalu klik 2x untuk memilih");
+        info.setHorizontalAlignment(SwingConstants.CENTER);
+        info.setBorder(new EmptyBorder(5, 0, 5, 0));
+        p.add(info, BorderLayout.SOUTH);
+
+        dlg.add(p);
+        dlg.setVisible(true);
+
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+
+
+   private void openPilihVoucherFrame() {
+    try {
+        List<Voucher> list = DatabaseHelper.getAllVouchers();
+
+        JDialog dlg = new JDialog(
+                SwingUtilities.getWindowAncestor(this),
+                "Pilih Voucher",
+                Dialog.ModalityType.APPLICATION_MODAL
+        );
+        dlg.setSize(500, 350);
+        dlg.setLocationRelativeTo(this);
+        dlg.setLayout(new BorderLayout(10, 10));
+
+        // ================= SEARCH FIELD =================
+        JTextField txtSearch = new JTextField();
+        txtSearch.setBorder(BorderFactory.createTitledBorder("Cari Kode Voucher"));
+        txtSearch.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
+        // ================= TABLE =================
+        String[] col = {"Kode","Nama Guru", "Nominal"};
+        DefaultTableModel m = new DefaultTableModel(col, 0) {
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
+        };
+
+        if (list != null) {
+            for (Voucher v : list) {
+                m.addRow(new Object[]{
+                        v.getKode(),
+                        v.getNamaGuru(),
+                        formatCurrency(v.getCurrentBalance())
+                });
+            }
+        }
+
+        JTable t = new JTable(m);
+        t.setRowHeight(25);
+
+        // ===== [BARU] sorter untuk search =====
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(m);
+        t.setRowSorter(sorter);
+
+        txtSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            private void filter() {
+                String text = txtSearch.getText();
+                if (text.trim().isEmpty()) {
+                    sorter.setRowFilter(null);
+                } else {
+                    sorter.setRowFilter(RowFilter.regexFilter("(?i)" + text, 0)); // kolom KODE
                 }
-            };
-            if (list != null)
-                for (Voucher v : list) m.addRow(new Object[]{v.getKode(), formatCurrency(v.getCurrentBalance())});
-            JTable t = new JTable(m);
-            t.setRowHeight(25);
-            t.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    if (e.getClickCount() == 2 && t.getSelectedRow() != -1) {
-                        int r = t.getSelectedRow();
-                        String kode = t.getValueAt(r, 0).toString();
-                        for (Voucher v : list) if (v.getKode().equals(kode)) selectedVoucher = v;
+            }
+
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+        });
+
+        // ================= DOUBLE CLICK =================
+        t.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && t.getSelectedRow() != -1) {
+                    int viewRow = t.getSelectedRow();
+                    int modelRow = t.convertRowIndexToModel(viewRow);
+                    String kode = m.getValueAt(modelRow, 0).toString();
+
+                    for (Voucher v : list) {
+                        if (v.getKode().equals(kode)) {
+                            selectedVoucher = v;
+                            break;
+                        }
+                    }
+
+                    if (selectedVoucher != null) {
                         txtVoucher.setText(selectedVoucher.getKode());
                         txtVoucher.setForeground(Color.BLACK);
                         updateTotal();
                         dlg.dispose();
                     }
                 }
-            });
-            JPanel p = new JPanel(new BorderLayout());
-            p.add(new JScrollPane(t), BorderLayout.CENTER);
-            JLabel info = new JLabel("Klik 2x pilih, Klik kanan hapus");
-            info.setHorizontalAlignment(SwingConstants.CENTER);
-            t.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseReleased(MouseEvent e) {
-                    if (e.isPopupTrigger()) {
-                        selectedVoucher = null;
-                        txtVoucher.setText("- Voucher -");
-                        txtVoucher.setForeground(Color.GRAY);
-                        updateTotal();
-                        dlg.dispose();
-                    }
+            }
+        });
+
+        // ================= RIGHT CLICK RESET =================
+        t.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    selectedVoucher = null;
+                    txtVoucher.setText("- Voucher -");
+                    txtVoucher.setForeground(Color.GRAY);
+                    updateTotal();
+                    dlg.dispose();
                 }
-            });
-            p.add(info, BorderLayout.SOUTH);
-            dlg.add(p);
-            dlg.setVisible(true);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            }
+        });
+
+        JLabel info = new JLabel("Ketik untuk mencari • Klik 2x untuk memilih • Klik kanan untuk hapus");
+        info.setHorizontalAlignment(SwingConstants.CENTER);
+
+        dlg.add(txtSearch, BorderLayout.NORTH);
+        dlg.add(new JScrollPane(t), BorderLayout.CENTER);
+        dlg.add(info, BorderLayout.SOUTH);
+
+        dlg.setVisible(true);
+
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+}
+
 
     private void editCartRowQty(int modelRow) {
         String s = JOptionPane.showInputDialog(this, "Ubah Jumlah:");

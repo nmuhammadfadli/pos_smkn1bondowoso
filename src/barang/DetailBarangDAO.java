@@ -21,6 +21,7 @@ public class DetailBarangDAO {
             "FROM detail_barang a " +
             "LEFT JOIN barang b ON a.id_barang = b.id " +
             "LEFT JOIN data_supplier c ON a.id_supplier = c.id_supplier " +
+            "WHERE a.stok > 0 " + 
             "ORDER BY a.id_detail_barang";
         try (Connection conn = DatabaseHelper.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
